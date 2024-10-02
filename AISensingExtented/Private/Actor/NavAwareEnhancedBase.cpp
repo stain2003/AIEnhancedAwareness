@@ -2,6 +2,7 @@
 
 #include "NavigationSystem.h"
 #include "AI/NavigationSystemBase.h"
+#include "Evaluation/Blending/MovieSceneBlendType.h"
 #include "NavMesh/RecastNavMesh.h"
 
 ANavAwareEnhancedBase::ANavAwareEnhancedBase()
@@ -58,6 +59,12 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		EdgesMap.Emplace(x, y);
 	}
+	
+	// TMap<FVector*, FVector*> EdgesMap2;
+	// for (const auto& [x, y] : InArray)
+	// {
+	// 	EdgesMap2.Emplace(x, y);
+	// }
 
 
 	
@@ -75,7 +82,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	 */
 	int32 CurrentLineID = -1;
 	//LineHeader: supposed to be the head of the current line
-	FNavPoint LineHeader = OutArray.Last();
+	FNavPoint LineHeader = OutArray[0];
 	//Connector: supposed to be the tail of the current line
 	FNavPoint Connector = LineHeader;
 	//CurrentLineEntry: supposed to be the entry index of the current line
@@ -84,19 +91,29 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		//declare the top in the array is the "Connector"
 		//Check if the next line comes in;
+		LineHeader = OutArray[CurrentLineEntry];
 		if (CurrentLineID != Connector.LineID)
 		{
 			//Update
 			LineHeader = Connector;
 			CurrentLineID = Connector.LineID;
 			CurrentLineEntry = OutArray.Num() - 1;
+			//UE_LOG(LogTemp, Warning, TEXT("Updating info...\nCurrentLineEntry: %d"), CurrentLineEntry)
 		}
+		
+		UE_LOG(LogTemp, Warning, TEXT("CurrentLineEntry: %d, Head: [%f, %f, %f], tail: [%f, %f, %f], adding next element......"), CurrentLineEntry,
+		LineHeader.Start.X, LineHeader.Start.Y, LineHeader.Start.Z,
+		Connector.End.X, Connector.End.Y, Connector.End.Z)
+		
 		//find edges connected by connector's tail if there is one
 		if (const FVector* Value = EdgesMap.Find(Connector.End))
 		{
 			OutArray.Push(FNavPoint(Connector.End, *Value, CurrentLineID));
 			EdgesMap.Remove(Connector.End);
 			Connector = OutArray.Last();
+			// UE_LOG(LogTemp, Warning, TEXT("adding tail: [%f, %f, %f], [%f, %f, %f]"),
+			// 	Connector.End.X, Connector.End.Y, Connector.End.Z,
+			// 	Value->X, Value->Y, Value->Z)
 			continue;
 		}
 		//find edges connected by header's head if there is one
@@ -104,25 +121,33 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		{
 			OutArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentLineID), CurrentLineEntry);
 			EdgesMap.Remove(*Key);
+			// UE_LOG(LogTemp, Warning, TEXT("adding head: [%f, %f, %f], [%f, %f, %f]"),
+			// 	Key->X, Key->Y, Key->Z,
+			// 	LineHeader.Start.X, LineHeader.Start.Y, LineHeader.Start.Z)
 			continue;
 		}
 		//if no connected edges found for both LineHeader and Connector, starts the new line: push in a new value from map
+		
 		auto it = EdgesMap.CreateIterator();
 		OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentLineID + 1));
+		// UE_LOG(LogTemp, Warning, TEXT("starting new line: [%f, %f, %f], tail: [%f, %f, %f]"),
+		// 	it.Key().X, it.Key().Y, it.Key().Z,
+		// 	it.Value().X, it.Value().Y, OutArray.Top().End.Z)
 		Connector = OutArray.Last();
 		EdgesMap.Remove(it.Key());
 	}
 	
-
 	/*Debugger*/
 	if (bDebug)
 	{
-		for (auto& Elem : WallEdges)
+		for (auto& [Start, End, LineID] : OutArray)
         {
         	
         	UE_LOG(LogTemp, Warning,
         		TEXT("[Start: [%f, %f, %f], End: [%f, %f, %f], LineID: %d]"),
-        		Elem.Start.X, Elem.Start.Y, Elem.Start.Z, Elem.End.X, Elem.End.Y, Elem.End.Z, Elem.LineID)
+        		Start.X, Start.Y, Start.Z, End.X, End.Y, End.Z, LineID)
+
+			DrawDebugDirectionalArrow(GetWorld(), Start, End, 1.f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
         }
 	}
 }
