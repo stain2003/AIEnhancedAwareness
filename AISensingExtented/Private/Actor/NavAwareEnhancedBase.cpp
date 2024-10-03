@@ -39,7 +39,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		{
 			FVector start = WallEdges[i].Start;
 			FVector end = WallEdges[i].End;
-			DrawDebugBox(GetWorld(), start, FVector(20.f, 20.f, 80.f), FColor::Red, false, 1.1f);
+			DrawDebugBox(GetWorld(), start, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
 		}
 	}
 }
@@ -59,8 +59,6 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		EdgesMap.Emplace(x, y);
 	}
-
-
 	
 	/*algorithm to transfer points from TMap to OutArray, sorted by these orders:
 	 * the points on the same line has the same LineID
@@ -116,6 +114,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		if (const FVector* Key = EdgesMap.FindKey(LineHeader.Start))
 		{
 			OutArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentLineID), CurrentLineEntry);
+			LineHeader = OutArray[CurrentLineEntry];
 			UE_LOG(LogTemp, Warning, TEXT("adding head: [%.0f, %.0f], [%.0f, %.0f]"),
 				Key->X, Key->Y,
 				LineHeader.Start.X, LineHeader.Start.Y)
@@ -131,11 +130,11 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			//if it has tail
 			CurrentLineID += 1;
 			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentLineID));
-			EdgesMap.Remove(it.Value());
 			LineHeader = OutArray.Last();
-			CurrentLineEntry = OutArray.Num() - 1;
 			OutArray.Push(FNavPoint(it.Value(), *TailValue, CurrentLineID));
 			Connector = OutArray.Last();
+			CurrentLineEntry = OutArray.Num() - 2;
+			EdgesMap.Remove(it.Value());
 			UE_LOG(LogTemp, Warning, TEXT("adding new line: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second: [Start: [%.0f, %.0f], End: [%.0f, %.0f]")
 				,it.Key().X, it.Key().Y, it.Value().X, it.Value().Y, it.Value().X, it.Value().Y, TailValue->X, TailValue->Y)
 		}
@@ -144,11 +143,11 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			//if it has head
 			CurrentLineID += 1;
 			OutArray.Push(FNavPoint(*HeadKey, it.Key(), CurrentLineID));
-			EdgesMap.Remove(*HeadKey);
 			LineHeader = OutArray.Last();
-			CurrentLineEntry = OutArray.Num() - 1;
 			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentLineID));
 			Connector = OutArray.Last();
+			CurrentLineEntry = OutArray.Num() - 2;
+			EdgesMap.Remove(*HeadKey);
 			UE_LOG(LogTemp, Warning, TEXT("adding new line: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
 				HeadKey->X, HeadKey->Y, it.Key().X, it.Key().Y, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)
 		}
@@ -161,11 +160,6 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			CurrentLineEntry += 1;
 		}
 		EdgesMap.Remove(it.Key());
-		//CurrentLineID = NewPoint.LineID;
-		//CurrentLineEntry = OutArray.Num() - 1;
-		/*UE_LOG(LogTemp, Warning, TEXT("starting new line: [%.0f, %.0f], tail: [%.0f, %.0f]"),
-			it.Key().X, it.Key().Y, it.Key().Z,
-			it.Value().X, it.Value().Y, OutArray.Top().End.Z)*/
 	}
 	
 	/*Debugger*/
@@ -180,6 +174,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 
 			DrawDebugDirectionalArrow(GetWorld(), Start, End, 1.f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
         }
+		UE_LOG(LogTemp, Warning, TEXT("Sorting finished, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
 	}
 }
 
