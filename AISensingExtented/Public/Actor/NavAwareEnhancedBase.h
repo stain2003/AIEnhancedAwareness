@@ -8,6 +8,13 @@
 
 #include "NavAwareEnhancedBase.generated.h"
 
+UENUM(BlueprintType)
+enum class EWallType : uint8
+{
+	Wall,
+	Edge,
+};
+
 USTRUCT(BlueprintType)
 struct FNavPoint
 {
@@ -18,9 +25,15 @@ struct FNavPoint
 	
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
 	FVector End;
+	
+	UPROPERTY(BlueprintReadWrite, Category="Navigation")
+	uint8 EdgeID;
+	
+	UPROPERTY(BlueprintReadWrite, Category="Navigation")
+	uint8 LineID;
 
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	int32 LineID;
+	EWallType Type;
 };
 
 UCLASS()
@@ -48,7 +61,11 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void FindWall(bool bDebug = false, float radius = 550.f);
 
+	UPROPERTY(EditAnywhere, Category= "TerranInfo")
+	bool bShowLog = false;
+	
 public:
 private:
-	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false);
+	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false) const;
+	void DefineCorner() const;
 };
