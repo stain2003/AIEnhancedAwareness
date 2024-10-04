@@ -68,25 +68,25 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	 * single edge will be sent to the top of the array, with LineID '0'
 	 */
 	
-	
 	int32 CurrentLineEntry = 0;	//CurrentLineEntry: supposed to be the entry index of the current line
 	uint8 CurrentIndex = 0;		//For marking id
 	int32 CurrentLineID = -1;	//LineID: supposed to be the id of the current line
+	
 	//Take the first in the array as the start point, finding the corresponding Start with its End.
 	//Insert the first element as the beginning, if its single, insert it as lineID '0'
 	if (EdgesMap.Find(InArray[0].End) != nullptr || EdgesMap.FindKey(InArray[0].Start) != nullptr)
 	{
-		CurrentLineID = 1;
 		CurrentIndex++;
+		CurrentLineID = 1;	
 		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
-		UE_LOG(LogTemp, Warning, TEXT("adding first line[%d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
+		UE_LOG(LogTemp, Warning, TEXT("adding first line[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
 			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)
 	}
 	else
 	{
 		CurrentLineID = 0;
 		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
-		UE_LOG(LogTemp, Warning, TEXT("adding first line(single)[%d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
+		UE_LOG(LogTemp, Warning, TEXT("adding first line(single)[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
 			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)
 	}
 	EdgesMap.Remove(InArray[0].Start);
@@ -94,35 +94,35 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	FNavPoint LineHeader = OutArray[0];	//LineHeader: supposed to be the head of the current line
 	FNavPoint Connector = LineHeader;	//Connector: supposed to be the tail of the current line
 	
-	/*The main part of the algorithm, loop until map is empty, which means the transfer is completed
+	/*The main part of the algorithm, loop through every element until map is empty, which means the transfer is completed
 	 */
 	while(EdgesMap.Num() != 0)
 	{
 		CurrentIndex++;
-		//Find the edge connected by connector if there is one
+		//Find the edge connected by connector if there is one(tail)
 		if (const FVector* Value = EdgesMap.Find(Connector.End))
 		{
 			OutArray.Push(FNavPoint(Connector.End, *Value, CurrentIndex, CurrentLineID));
-			UE_LOG(LogTemp, Warning, TEXT("adding tail[%d]: [%.0f, %.0f], [%.0f, %.0f]"),
-				CurrentIndex, Connector.End.X, Connector.End.Y,
-				Value->X, Value->Y)
 			EdgesMap.Remove(Connector.End);
 			Connector = OutArray.Last();
+			
+			UE_LOG(LogTemp, Warning, TEXT("adding tail[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
+				CurrentIndex, Connector.End.X, Connector.End.Y, Value->X, Value->Y)
 			continue;
 		}
-		//Find the edge connected by header if there is one
+		//Find the edge connected by header if there is one(head)
 		if (const FVector* Key = EdgesMap.FindKey(LineHeader.Start))
 		{
 			OutArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentIndex, CurrentLineID), CurrentLineEntry);
-			LineHeader = OutArray[CurrentLineEntry];
-			UE_LOG(LogTemp, Warning, TEXT("adding head[%d]: [%.0f, %.0f], [%.0f, %.0f]"),
-				CurrentIndex, Key->X, Key->Y,
-				LineHeader.Start.X, LineHeader.Start.Y)
 			EdgesMap.Remove(*Key);
+			LineHeader = OutArray[CurrentLineEntry];
+			
+			UE_LOG(LogTemp, Warning, TEXT("adding head[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
+				CurrentIndex, Key->X, Key->Y, LineHeader.Start.X, LineHeader.Start.Y)
 			continue;
 		}
 		
-		//Starts the new line: push in a new value from map if no connected edges found for both LineHeader and Connector,
+		//adding a new line: push in a new value from map if no connected edges found for both LineHeader and Connector,
 		const auto it = EdgesMap.CreateIterator();
 		//check the incoming line as if a single line or not, if not, add its found head or tail along into the map
 		if (const FVector* TailValue = EdgesMap.Find(it.Value()))
@@ -138,7 +138,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			CurrentLineEntry = OutArray.Num() - 2;
 			EdgesMap.Remove(it.Value());
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding new line[%d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+			UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
 				CurrentIndex - 1, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y, CurrentIndex, it.Value().X, it.Value().Y, TailValue->X, TailValue->Y)
 		}
 		else if (const FVector* HeadKey = EdgesMap.FindKey(it.Key()))
@@ -154,14 +154,14 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			CurrentLineEntry = OutArray.Num() - 2;
 			EdgesMap.Remove(*HeadKey);
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding new line[%d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+			UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
 				CurrentIndex - 1, HeadKey->X, HeadKey->Y, it.Key().X, it.Key().Y, CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)
 		}
 		else
 		{
 			//if it is single, insert it to the top
 			OutArray.Insert(FNavPoint(it.Key(), it.Value(), CurrentIndex, 0), 0);
-			UE_LOG(LogTemp, Warning, TEXT("adding single line[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+			UE_LOG(LogTemp, Warning, TEXT("adding single line[%02d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
 				CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)
 			CurrentLineEntry += 1;
 		}
@@ -181,9 +181,9 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		for (auto& [Start, End, ID, LineID, Type] : OutArray)
         {
-        	
+        	//prints out all elements
         	UE_LOG(LogTemp, Warning,
-        		TEXT("[Start: [%.0f, %.0f], End: [%.0f, %.0f], ID: %d, LineID: %d, Type: %d]"),
+        		TEXT("[Start: [%.0f, %.0f], End: [%.0f, %.0f], ID: %02d, LineID: %d, Type: %d]"),
         		Start.X, Start.Y, End.X, End.Y, ID, LineID, Type)
 			
         }
