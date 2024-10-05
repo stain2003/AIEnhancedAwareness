@@ -8,6 +8,8 @@
 
 #include "NavAwareEnhancedBase.generated.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(NavAware, Log, All);
+
 UENUM(BlueprintType)
 enum class EWallType : uint8
 {

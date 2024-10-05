@@ -5,6 +5,9 @@
 #include "Evaluation/Blending/MovieSceneBlendType.h"
 #include "NavMesh/RecastNavMesh.h"
 
+DEFINE_LOG_CATEGORY(NavAware);
+
+
 ANavAwareEnhancedBase::ANavAwareEnhancedBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -61,6 +64,10 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		EdgesMap.Emplace(x, y);
 	}
+
+
+
+
 	
 	/*algorithm to transfer points from TMap to OutArray, sorted by these orders:
 	 * edges on the same line has the same LineID
@@ -79,15 +86,15 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		CurrentIndex++;
 		CurrentLineID = 1;	
 		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
-		UE_LOG(LogTemp, Warning, TEXT("adding first line[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
-			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)
+		/*UE_LOG(LogTemp, Warning, TEXT("adding first line[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
+			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)*/
 	}
 	else
 	{
 		CurrentLineID = 0;
 		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
-		UE_LOG(LogTemp, Warning, TEXT("adding first line(single)[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
-			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)
+		/*UE_LOG(LogTemp, Warning, TEXT("adding first line(single)[%02d]: [Start: [%.0f, %.0f] End: [%.0f, %.0f]] with lineID: %d"),
+			CurrentIndex, InArray[0].Start.X, InArray[0].Start.Y, InArray[0].End.X, InArray[0].End.Y, CurrentLineID)*/
 	}
 	EdgesMap.Remove(InArray[0].Start);
 	
@@ -106,8 +113,8 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			EdgesMap.Remove(Connector.End);
 			Connector = OutArray.Last();
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding tail[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
-				CurrentIndex, Connector.End.X, Connector.End.Y, Value->X, Value->Y)
+			/*UE_LOG(LogTemp, Warning, TEXT("adding tail[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
+				CurrentIndex, Connector.End.X, Connector.End.Y, Value->X, Value->Y)*/
 			continue;
 		}
 		//Find the edge connected by header if there is one(head)
@@ -117,8 +124,8 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			EdgesMap.Remove(*Key);
 			LineHeader = OutArray[CurrentLineEntry];
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding head[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
-				CurrentIndex, Key->X, Key->Y, LineHeader.Start.X, LineHeader.Start.Y)
+			/*UE_LOG(LogTemp, Warning, TEXT("adding head[%02d]: [%.0f, %.0f], [%.0f, %.0f]"),
+				CurrentIndex, Key->X, Key->Y, LineHeader.Start.X, LineHeader.Start.Y)*/
 			continue;
 		}
 		
@@ -138,8 +145,8 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			CurrentLineEntry = OutArray.Num() - 2;
 			EdgesMap.Remove(it.Value());
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
-				CurrentIndex - 1, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y, CurrentIndex, it.Value().X, it.Value().Y, TailValue->X, TailValue->Y)
+			/*UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+				CurrentIndex - 1, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y, CurrentIndex, it.Value().X, it.Value().Y, TailValue->X, TailValue->Y)*/
 		}
 		else if (const FVector* HeadKey = EdgesMap.FindKey(it.Key()))
 		{
@@ -154,40 +161,48 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			CurrentLineEntry = OutArray.Num() - 2;
 			EdgesMap.Remove(*HeadKey);
 			
-			UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
-				CurrentIndex - 1, HeadKey->X, HeadKey->Y, it.Key().X, it.Key().Y, CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)
+			/*UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+				CurrentIndex - 1, HeadKey->X, HeadKey->Y, it.Key().X, it.Key().Y, CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)*/
 		}
 		else
 		{
 			//if it is single, insert it to the top
 			OutArray.Insert(FNavPoint(it.Key(), it.Value(), CurrentIndex, 0), 0);
-			UE_LOG(LogTemp, Warning, TEXT("adding single line[%02d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
-				CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)
+			/*UE_LOG(LogTemp, Warning, TEXT("adding single line[%02d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
+				CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)*/
 			CurrentLineEntry += 1;
 		}
 		EdgesMap.Remove(it.Key());
 	}
 
 	//Marking walls or edges
-	/*for (auto& currentElem : OutArray)
+	uint8 StartIndex = 0;
+	uint8 EndIndex = OutArray.Num() - 1;
+	for (auto& currentElem : OutArray)
 	{
 		if (currentElem.LineID != 0)
 		{
-			;
+			break;
 		}
-	}*/
+		StartIndex++;
+	}
+	for (int i = StartIndex; i <= EndIndex; i++)
+	{
+		;
+	}
+	
 	/*Debugger*/
 	if (bShowLog)
 	{
 		for (auto& [Start, End, ID, LineID, Type] : OutArray)
         {
         	//prints out all elements
-        	UE_LOG(LogTemp, Warning,
+        	UE_LOG(NavAware, Display,
         		TEXT("[Start: [%.0f, %.0f], End: [%.0f, %.0f], ID: %02d, LineID: %d, Type: %d]"),
         		Start.X, Start.Y, End.X, End.Y, ID, LineID, Type)
 			
         }
-		UE_LOG(LogTemp, Warning, TEXT("Sorting finished, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
+		UE_LOG(NavAware, Warning, TEXT("Sorting finished, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
 	}
 }
 
