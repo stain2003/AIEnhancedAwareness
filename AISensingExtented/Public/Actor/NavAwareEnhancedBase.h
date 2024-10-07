@@ -15,6 +15,7 @@ enum class EWallType : uint8
 {
 	Wall,
 	Corner,
+	Entry
 };
 
 USTRUCT(BlueprintType)
@@ -71,7 +72,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCachedDegs = 50.f;
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minCurrDeg = 20.f;
+	float minCurDeg = 20.f;
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCompens = 50.f;
 	
 public:
 private:

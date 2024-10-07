@@ -65,8 +65,6 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	}
 
 
-
-
 	
 	/*algorithm to transfer points from TMap to OutArray, sorted by these orders:
 	 * edges on the same line has the same LineID
@@ -174,7 +172,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		EdgesMap.Remove(it.Key());
 	}
 
-	//Marking walls or edges
+	//Define the start index, to skip LineID '0'
 	uint8 StartIndex = 0;
 	uint8 EndIndex = OutArray.Num() - 1;
 	for (auto& currentElem : OutArray)
@@ -185,64 +183,67 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		}
 		StartIndex++;
 	}
-	FVector curVector;
-	FVector nxtVector;
-	float cachedDegs;
-	uint8 cachedCount;
-	float curDeg;
-	FNavPoint CurEdge;
-	FNavPoint NxtEdge;
-	for (int i = StartIndex; i < EndIndex; i++)
+
+	//Main loop
+	FNavPoint curEdge;
+	FNavPoint nxtEdge;
+	float curDeg = 0.f;
+	float lastDeg = 0.f;
+	FVector curVect = FVector::ZeroVector;
+	FVector nxtVect = FVector::ZeroVector;
+	bool isEdging = false;
+	
+	for(uint8 i = StartIndex; i < EndIndex; i++)
 	{
-		if (OutArray[i].LineID == OutArray[i+1].LineID)
+		curEdge = OutArray[i];
+		nxtEdge = OutArray[i+1];
+		
+		if (curEdge.LineID == nxtEdge.LineID)
 		{
-			CurEdge = OutArray[i];
-			NxtEdge = OutArray[i+1];
-			curVector = (CurEdge.End - CurEdge.Start).GetSafeNormal2D();
-			nxtVector = (NxtEdge.End - NxtEdge.Start).GetSafeNormal2D();
-			curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVector, nxtVector)));
-			if (FVector::CrossProduct(curVector, nxtVector).Z < 0)
-            {
-            	curDeg = -curDeg;
-            }
-			cachedDegs += curDeg;
-			cachedCount++;
-			UE_LOG(LogTemp, Warning, TEXT("Reading radians of [%02d] and [%02d]: [%.2f]; CachedDegs: %.2f, CachedCount: %d"),
-				CurEdge.EdgeID, NxtEdge.EdgeID, curDeg, cachedDegs, cachedCount)
-			
-			FString printstring = FString::Printf(TEXT("[%02d in %d]Deg: %.2f in %.2f"), CurEdge.EdgeID, cachedCount, curDeg, cachedDegs);
-			DrawDebugString(GetWorld(), OutArray[i].End + FVector(0.f,0.f,0.f), printstring, 0, FColor::White, 1.f, false, 1.f);
-			
-			bool bminCount = cachedCount >= minCount;
-			bool bminCachedDegs = cachedDegs >= minCachedDegs || cachedDegs <= -minCachedDegs;
-			bool bminCurrDeg = curDeg >= minCurrDeg || curDeg <= -minCurrDeg;
-			
-			if (bminCount && bminCachedDegs && bminCurrDeg)
+			curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
+			nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
+			curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
+			if (curDeg > minCurDeg)	//if this edge is a corner
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[%02d][%02d]: Edge detected!"),
-					CurEdge.EdgeID, NxtEdge.EdgeID)
-				CurEdge.Type = EWallType::Corner;
-				// DrawDebugDirectionalArrow(GetWorld(), OutArray[i].Start + FVector(0.f,0.f,20.f), OutArray[i].End + FVector(0.f,0.f,20.f),
-				// 	1.f, FColor::Blue, false, 1.f);
-				// DrawDebugDirectionalArrow(GetWorld(), OutArray[i+1].Start + FVector(0.f,0.f,20.f), OutArray[i+1].End + FVector(0.f,0.f,20.f),
-				// 	1.f, FColor::Blue, false, 1.f);
-				DrawDebugSphere(GetWorld(), CurEdge.End, 30.f, 8, FColor::Blue, false, 1.0f);
+				const int Compensation = FMath::Abs(lastDeg + curDeg);
+				if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
+				{
+					OutArray[i-1].Type = EWallType::Wall;
+					UE_LOG(LogTemp, Display, TEXT("Edge[%02d] is a fake corner!"), OutArray[i-1].EdgeID)
+				}
+				else  //this corner is ture
+				{
+					OutArray[i].Type = EWallType::Corner;
+					UE_LOG(LogTemp, Display, TEXT("Found a corner: Edge[%02d]!"), curEdge.EdgeID)
+					if (!isEdging)
+					{
+						isEdging = true;
+						UE_LOG(LogTemp, Display, TEXT("Entering a corner on Edge[%02d]!"), curEdge.EdgeID)
+					}
+				}
 			}
-			
-			if (cachedCount >= 4)
+			else //if this edge is not a corner
 			{
-				cachedCount = 0;
-				cachedDegs = 0.f;
+				if (isEdging) //exit isEdging
+				{
+					isEdging = false;
+					UE_LOG(LogTemp, Display, TEXT("Exit corner on Edge[%02d]!"), curEdge.EdgeID)
+				}
 			}
+
+			//do every edge when in the same line:
+			lastDeg = curDeg;
 		}
-		else
+		else //when reach the end of the current line
 		{
-			UE_LOG(LogTemp, Warning, TEXT("End of current line, clearing cached to prepare for the new line"))
-			cachedCount = 0;
-			cachedDegs = 0.f;
+			lastDeg = 0.f;
+			UE_LOG(LogTemp, Display, TEXT("Reaching the end of the line on Edge[%02d]!"), curEdge.EdgeID)
 		}
 		
+		FString printstring = FString::Printf(TEXT("[%02d]Deg: %.2f "), curEdge.EdgeID, curDeg);
+		DrawDebugString(GetWorld(), OutArray[i].End + FVector(0.f,0.f,0.f), printstring, 0, FColor::White, 1.f, false, 1.f);
 	}
+	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
 	
 	/*Debugger*/
 	if (bShowLog)
