@@ -2,7 +2,6 @@
 
 #include "NavigationSystem.h"
 #include "AI/NavigationSystemBase.h"
-#include "Evaluation/Blending/MovieSceneBlendType.h"
 #include "NavMesh/RecastNavMesh.h"
 
 DEFINE_LOG_CATEGORY(NavAware);
@@ -186,9 +185,63 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		}
 		StartIndex++;
 	}
-	for (int i = StartIndex; i <= EndIndex; i++)
+	FVector curVector;
+	FVector nxtVector;
+	float cachedDegs;
+	uint8 cachedCount;
+	float curDeg;
+	FNavPoint CurEdge;
+	FNavPoint NxtEdge;
+	for (int i = StartIndex; i < EndIndex; i++)
 	{
-		;
+		if (OutArray[i].LineID == OutArray[i+1].LineID)
+		{
+			CurEdge = OutArray[i];
+			NxtEdge = OutArray[i+1];
+			curVector = (CurEdge.End - CurEdge.Start).GetSafeNormal2D();
+			nxtVector = (NxtEdge.End - NxtEdge.Start).GetSafeNormal2D();
+			curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVector, nxtVector)));
+			if (FVector::CrossProduct(curVector, nxtVector).Z < 0)
+            {
+            	curDeg = -curDeg;
+            }
+			cachedDegs += curDeg;
+			cachedCount++;
+			UE_LOG(LogTemp, Warning, TEXT("Reading radians of [%02d] and [%02d]: [%.2f]; CachedDegs: %.2f, CachedCount: %d"),
+				CurEdge.EdgeID, NxtEdge.EdgeID, curDeg, cachedDegs, cachedCount)
+			
+			FString printstring = FString::Printf(TEXT("[%02d in %d]Deg: %.2f in %.2f"), CurEdge.EdgeID, cachedCount, curDeg, cachedDegs);
+			DrawDebugString(GetWorld(), OutArray[i].End + FVector(0.f,0.f,0.f), printstring, 0, FColor::White, 1.f, false, 1.f);
+			
+			bool bminCount = cachedCount >= minCount;
+			bool bminCachedDegs = cachedDegs >= minCachedDegs || cachedDegs <= -minCachedDegs;
+			bool bminCurrDeg = curDeg >= minCurrDeg || curDeg <= -minCurrDeg;
+			
+			if (bminCount && bminCachedDegs && bminCurrDeg)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[%02d][%02d]: Edge detected!"),
+					CurEdge.EdgeID, NxtEdge.EdgeID)
+				CurEdge.Type = EWallType::Corner;
+				// DrawDebugDirectionalArrow(GetWorld(), OutArray[i].Start + FVector(0.f,0.f,20.f), OutArray[i].End + FVector(0.f,0.f,20.f),
+				// 	1.f, FColor::Blue, false, 1.f);
+				// DrawDebugDirectionalArrow(GetWorld(), OutArray[i+1].Start + FVector(0.f,0.f,20.f), OutArray[i+1].End + FVector(0.f,0.f,20.f),
+				// 	1.f, FColor::Blue, false, 1.f);
+				DrawDebugSphere(GetWorld(), CurEdge.End, 30.f, 8, FColor::Blue, false, 1.0f);
+			}
+			
+			if (cachedCount >= 4)
+			{
+				cachedCount = 0;
+				cachedDegs = 0.f;
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("End of current line, clearing cached to prepare for the new line"))
+			cachedCount = 0;
+			cachedDegs = 0.f;
+		}
+		
 	}
 	
 	/*Debugger*/

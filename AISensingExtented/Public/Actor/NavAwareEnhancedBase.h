@@ -14,7 +14,7 @@ UENUM(BlueprintType)
 enum class EWallType : uint8
 {
 	Wall,
-	Edge,
+	Corner,
 };
 
 USTRUCT(BlueprintType)
@@ -23,19 +23,19 @@ struct FNavPoint
 	GENERATED_BODY()
 	
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	FVector Start;
+	FVector Start = FVector::ZeroVector;
 	
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	FVector End;
+	FVector End = FVector::ZeroVector;;
 	
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	uint8 EdgeID;
+	uint8 EdgeID = 0;
 	
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	uint8 LineID;
+	uint8 LineID = 0;
 
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	EWallType Type;
+	EWallType Type = EWallType::Wall;
 };
 
 UCLASS()
@@ -65,6 +65,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
 	bool bShowLog = false;
+
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	uint8 minCount = 0;
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCachedDegs = 50.f;
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCurrDeg = 20.f;
 	
 public:
 private:
