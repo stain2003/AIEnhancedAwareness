@@ -203,22 +203,22 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 			curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
 			nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
 			curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
-			if (curDeg > minCurDeg)	//if this edge is a corner
+			if (curDeg >= minCurDeg || curDeg <= -minCurDeg)	//if this edge is a corner
 			{
 				const int Compensation = FMath::Abs(lastDeg + curDeg);
 				if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
 				{
 					OutArray[i-1].Type = EWallType::Wall;
-					UE_LOG(LogTemp, Display, TEXT("Edge[%02d] is a fake corner!"), OutArray[i-1].EdgeID)
+					UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d], cur Deg: %1f, last Deg: %1f"), curEdge.EdgeID, OutArray[i-1].EdgeID, curDeg, lastDeg)
 				}
 				else  //this corner is ture
 				{
 					OutArray[i].Type = EWallType::Corner;
-					UE_LOG(LogTemp, Display, TEXT("Found a corner: Edge[%02d]!"), curEdge.EdgeID)
+					UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg, lastDeg)
 					if (!isEdging)
 					{
 						isEdging = true;
-						UE_LOG(LogTemp, Display, TEXT("Entering a corner on Edge[%02d]!"), curEdge.EdgeID)
+						//UE_LOG(LogTemp, Display, TEXT("Entering a corner on Edge[%02d]!"), curEdge.EdgeID)
 					}
 				}
 			}
@@ -227,7 +227,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 				if (isEdging) //exit isEdging
 				{
 					isEdging = false;
-					UE_LOG(LogTemp, Display, TEXT("Exit corner on Edge[%02d]!"), curEdge.EdgeID)
+					UE_LOG(LogTemp, Display, TEXT("[%02d]Exit corner on Edge[%02d]: curDeg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg)
 				}
 			}
 
@@ -237,7 +237,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		else //when reach the end of the current line
 		{
 			lastDeg = 0.f;
-			UE_LOG(LogTemp, Display, TEXT("Reaching the end of the line on Edge[%02d]!"), curEdge.EdgeID)
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Reaching the end of the line on Edge[%02d]!"), curEdge.EdgeID, curEdge.EdgeID)
 		}
 		
 		FString printstring = FString::Printf(TEXT("[%02d]Deg: %.2f "), curEdge.EdgeID, curDeg);
