@@ -37,6 +37,9 @@ struct FNavPoint
 
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
 	EWallType Type = EWallType::Wall;
+
+	UPROPERTY(BlueprintReadWrite, Category="Navigation")
+	int Degree = 0;
 };
 
 UCLASS()
@@ -55,30 +58,38 @@ public:
 	
 /*Navigation*/
 protected:
+	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
 
+	/*Prints out elements from stored array with info, only works when bDebug is ture*/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo")
+	bool bShowLog = false;
+	/**/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	uint8 minCount = 0;
+	/**/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCachedDegs = 50.f;
+	/*Min degree required for a point to be recognized as a corner*/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCurDeg = 35.f;
+	/*Min compensation of current and last degree under which will be recognize the current and the last point is not a corner*/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float minCompens = 45.f;
+
 	/*
-	 * Find edges around
+	 * Find walls & corners around
 	 */
 	UFUNCTION(BlueprintCallable)
 	void FindWall(bool bDebug = false, float radius = 550.f);
-
-	UPROPERTY(EditAnywhere, Category= "TerranInfo")
-	bool bShowLog = false;
-
-	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	uint8 minCount = 0;
-	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minCachedDegs = 50.f;
-	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minCurDeg = 20.f;
-	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minCompens = 50.f;
 	
 public:
 private:
 	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false) const;
 	void MarkCorner(TArray<FNavPoint>& InOutArray) const;
+	/*
+	 * Takes into two edges: current & next, and calculate current edge's degree. In the meantime check if it is fake: use compensation of the last edge's degree and current edge's
+	 */
 	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8& i) const;
 };
