@@ -79,5 +79,6 @@ protected:
 public:
 private:
 	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false) const;
-	void DefineCorner() const;
+	void MarkCorner(TArray<FNavPoint>& InOutArray) const;
+	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8& i) const;
 };

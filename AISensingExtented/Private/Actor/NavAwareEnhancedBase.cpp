@@ -31,7 +31,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		TArray<FNavigationWallEdge> GetEdges;
 		
 		RecastNavMesh->FindEdges(NodeRef, GetActorLocation(), radius, NavSystem->CreateDefaultQueryFilterCopy(), GetEdges);
-		
+		//RecastNavMesh->GetPolyVerts()
 		GatherEdgesWithSorting(GetEdges, WallEdges, bDebug);
 	}
 	
@@ -43,7 +43,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 			FVector lend = edge.End;
 			int lID = edge.LineID;
 			DrawDebugBox(GetWorld(), lend, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
-			DrawDebugDirectionalArrow(GetWorld(), lstart, lend, 1.f, FColor::MakeRedToGreenColorFromScalar(lID * 0.15f), false, 1.f);
+			DrawDebugDirectionalArrow(GetWorld(), lstart, lend, 2.5f, FColor::MakeRedToGreenColorFromScalar(lID * 0.15f), false, 1.f);
 		}
 	}
 }
@@ -103,7 +103,9 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	while(EdgesMap.Num() != 0)
 	{
 		CurrentIndex++;
-		//Find the edge connected by connector if there is one(tail)
+		/*
+		 *Try to find edges that connected to current line*/
+		//Edge found that connected by connector if there is one(tail)
 		if (const FVector* Value = EdgesMap.Find(Connector.End))
 		{
 			OutArray.Push(FNavPoint(Connector.End, *Value, CurrentIndex, CurrentLineID));
@@ -114,7 +116,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 				CurrentIndex, Connector.End.X, Connector.End.Y, Value->X, Value->Y)*/
 			continue;
 		}
-		//Find the edge connected by header if there is one(head)
+		//Edge found that connected by header if there is one(head)
 		if (const FVector* Key = EdgesMap.FindKey(LineHeader.Start))
 		{
 			OutArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentIndex, CurrentLineID), CurrentLineEntry);
@@ -125,16 +127,18 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 				CurrentIndex, Key->X, Key->Y, LineHeader.Start.X, LineHeader.Start.Y)*/
 			continue;
 		}
-		
-		//adding a new line: push in a new value from map if no connected edges found for both LineHeader and Connector,
+
+		/*
+		 *No connected edge found, starts a new line*/
 		const auto it = EdgesMap.CreateIterator();
-		//check the incoming line as if a single line or not, if not, add its found head or tail along into the map
+		//adding the new element accordingly: 1)if its single 2)if it has head 2)if it has tail 
 		if (const FVector* TailValue = EdgesMap.Find(it.Value()))
 		{
-			//if it has tail, add this first
 			CurrentLineID += 1;
+			//if it has tail, add this first
 			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
 			LineHeader = OutArray.Last();
+			
 			//then add its tail
 			CurrentIndex++;
 			OutArray.Push(FNavPoint(it.Value(), *TailValue, CurrentIndex, CurrentLineID));
@@ -147,16 +151,17 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		}
 		else if (const FVector* HeadKey = EdgesMap.FindKey(it.Key()))
 		{
-			//if it has head, add its head first
 			CurrentLineID += 1;
+			//if it has head, add its head first
 			OutArray.Push(FNavPoint(*HeadKey, it.Key(), CurrentIndex, CurrentLineID));
 			LineHeader = OutArray.Last();
+			EdgesMap.Remove(*HeadKey);
+			
 			//then add this
 			CurrentIndex++;
 			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
 			Connector = OutArray.Last();
 			CurrentLineEntry = OutArray.Num() - 2;
-			EdgesMap.Remove(*HeadKey);
 			
 			/*UE_LOG(LogTemp, Warning, TEXT("adding new line[%02d]: first: [Start: [%.0f, %.0f], End: [%.0f, %.0f] Second[%d]: [Start: [%.0f, %.0f], End: [%.0f, %.0f]"),
 				CurrentIndex - 1, HeadKey->X, HeadKey->Y, it.Key().X, it.Key().Y, CurrentIndex, it.Key().X, it.Key().Y, it.Value().X, it.Value().Y)*/
@@ -172,6 +177,9 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		EdgesMap.Remove(it.Key());
 	}
 
+	/*
+	 * Filtering wall type
+	 */
 	//Define the start index, to skip LineID '0'
 	uint8 StartIndex = 0;
 	uint8 EndIndex = OutArray.Num() - 1;
@@ -192,50 +200,27 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	FVector curVect = FVector::ZeroVector;
 	FVector nxtVect = FVector::ZeroVector;
 	bool isEdging = false;
+	uint8 headerIndex = 0;
 	
-	for(uint8 i = StartIndex; i < EndIndex; i++)
+	for(uint8 i = StartIndex; i < EndIndex; i++)	//note: 'i + 1' can be used safely
 	{
 		curEdge = OutArray[i];
 		nxtEdge = OutArray[i+1];
 		
-		if (curEdge.LineID == nxtEdge.LineID)
+		if (curEdge.LineID == nxtEdge.LineID) //when next edge is in the same line
 		{
-			curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
-			nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
-			curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
-			if (curDeg >= minCurDeg || curDeg <= -minCurDeg)	//if this edge is a corner
-			{
-				const int Compensation = FMath::Abs(lastDeg + curDeg);
-				if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
-				{
-					OutArray[i-1].Type = EWallType::Wall;
-					UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d], cur Deg: %1f, last Deg: %1f"), curEdge.EdgeID, OutArray[i-1].EdgeID, curDeg, lastDeg)
-				}
-				else  //this corner is ture
-				{
-					OutArray[i].Type = EWallType::Corner;
-					UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg, lastDeg)
-					if (!isEdging)
-					{
-						isEdging = true;
-						//UE_LOG(LogTemp, Display, TEXT("Entering a corner on Edge[%02d]!"), curEdge.EdgeID)
-					}
-				}
-			}
-			else //if this edge is not a corner
-			{
-				if (isEdging) //exit isEdging
-				{
-					isEdging = false;
-					UE_LOG(LogTemp, Display, TEXT("[%02d]Exit corner on Edge[%02d]: curDeg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg)
-				}
-			}
-
-			//do every edge when in the same line:
-			lastDeg = curDeg;
+			DetectCorner(OutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
 		}
 		else //when reach the end of the current line
 		{
+			//check if this line is a circle, and do corner detection if so
+			if (curEdge.End == OutArray[headerIndex].Start)	//if the tail and head is connected
+			{
+				nxtEdge = OutArray[headerIndex];
+				DetectCorner(OutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
+				UE_LOG(LogTemp, Display, TEXT("This Line %d is a circle"), curEdge.LineID)
+			}
+			headerIndex = i + 1;
 			lastDeg = 0.f;
 			UE_LOG(LogTemp, Display, TEXT("[%02d]Reaching the end of the line on Edge[%02d]!"), curEdge.EdgeID, curEdge.EdgeID)
 		}
@@ -245,7 +230,8 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
 	
-	/*Debugger*/
+	/*
+	 *Debugger*/
 	if (bShowLog)
 	{
 		for (auto& [Start, End, ID, LineID, Type] : OutArray)
@@ -260,8 +246,45 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	}
 }
 
-void ANavAwareEnhancedBase::DefineCorner() const
+void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 {
 	
+}
+
+void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8& i) const
+{
+	FVector curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
+	FVector nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
+	curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
+	if (curDeg >= minCurDeg || curDeg <= -minCurDeg)	//if this edge is a corner
+	{
+		const int Compensation = FMath::Abs(lastDeg + curDeg);
+		if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
+		{
+			InOutArray[i-1].Type = EWallType::Wall;
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d], cur Deg: %1f, last Deg: %1f"), curEdge.EdgeID, InOutArray[i-1].EdgeID, curDeg, lastDeg)
+		}
+		else  //this corner is ture
+		{
+			InOutArray[i].Type = EWallType::Corner;
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg, lastDeg)
+			if (!bisEdging)
+			{
+				bisEdging = true;
+				//UE_LOG(LogTemp, Display, TEXT("Entering a corner on Edge[%02d]!"), curEdge.EdgeID)
+			}
+		}
+	}
+	else //if this edge is not a corner
+	{
+		if (bisEdging)
+		{
+			//exit isEdging
+			bisEdging = false;
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Exit corner on Edge[%02d]: curDeg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg)
+		}
+	}
+	//do every edge when in the same line:
+	lastDeg = curDeg;
 }
 
