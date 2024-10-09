@@ -39,7 +39,7 @@ struct FNavPoint
 	EWallType Type = EWallType::Wall;
 
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
-	int Degree = 0;
+	float Degree = 0;
 };
 
 UCLASS()
