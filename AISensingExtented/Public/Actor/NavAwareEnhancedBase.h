@@ -61,7 +61,15 @@ protected:
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
-
+	TArray<FNavPoint> TestEdges = {
+		FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f))};
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
 	bool bShowLog = false;

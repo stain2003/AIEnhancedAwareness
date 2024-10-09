@@ -198,7 +198,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		FNavPoint& curEdge = InOutArray[i];
 		FNavPoint& nxtEdge = InOutArray[i+1];
 
-		//Check if is the end of the line
+		//Check if reach the end of the line yet 
 		if (curEdge.LineID == nxtEdge.LineID)
 		{
 			DetectCorner(InOutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
@@ -208,15 +208,15 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 			//check if this line is a circle, and do corner detection for the end edge if so
 			if (curEdge.End == InOutArray[headerIndex].Start)
 			{
-				nxtEdge = InOutArray[headerIndex];
-				DetectCorner(InOutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
-				if (curEdge.Type == EWallType::Corner && nxtEdge.Type == EWallType::Corner)
+				FNavPoint& headEdge = InOutArray[headerIndex];
+				DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, isEdging, i);
+				if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 				{
 					//check if two vectors are fake corners
-					if(CheckFakeCorner(nxtEdge.Degree, curEdge.Degree))
+					if(CheckFakeCorner(headEdge.Degree, curEdge.Degree))
 					{
 						curEdge.Type = EWallType::Wall;
-						nxtEdge.Type = EWallType::Wall;
+						headEdge.Type = EWallType::Wall;
 					}
 				}
 				UE_LOG(LogTemp, Display, TEXT("This Line %d is a circle"), curEdge.LineID)
