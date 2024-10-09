@@ -32,7 +32,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		
 		RecastNavMesh->FindEdges(NodeRef, GetActorLocation(), radius, NavSystem->CreateDefaultQueryFilterCopy(), GetEdges);
 		
-		GatherEdgesWithSorting(TestEdges2, WallEdges, bDebug);
+		GatherEdgesWithSorting(GetEdges, WallEdges, bDebug);
 		MarkCorner(WallEdges);
 	}
 	
@@ -173,6 +173,11 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 
 void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 {
+	if (InOutArray.Num() == 0)
+	{
+		return;
+	}
+	
 	/*
 	 * Filtering wall type
 	 */
