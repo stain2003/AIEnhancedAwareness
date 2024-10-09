@@ -204,8 +204,8 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		StartIndex++;
 	}
 
-	FNavPoint curEdge;
-	FNavPoint nxtEdge;
+	/*FNavPoint& curEdge;
+	FNavPoint& nxtEdge;*/
 	float curDeg = 0.f;
 	float lastDeg = 0.f;
 	bool isEdging = false;
@@ -215,8 +215,8 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 	 *Main loop*/
 	for(uint8 i = StartIndex; i < EndIndex; i++)	//note: 'i + 1' can be used safely
 	{
-		curEdge = InOutArray[i];
-		nxtEdge = InOutArray[i+1];
+		FNavPoint& curEdge = InOutArray[i];
+		FNavPoint& nxtEdge = InOutArray[i+1];
 		
 		if (curEdge.LineID == nxtEdge.LineID) //when next edge is in the same line
 		{
@@ -255,9 +255,9 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 	FVector curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
 	FVector nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
 	curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
-	InOutArray[i].Degree = curDeg;
+	curEdge.Degree = curDeg;
 	
-	if (curDeg >= minCurDeg || curDeg <= -minCurDeg)	//if this edge is a corner
+	if (CheckCorner(curDeg))	//if this edge is a corner
 	{
 		const int Compensation = FMath::Abs(lastDeg + curDeg);
 		if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
@@ -287,5 +287,17 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 	}
 	//do every edge when in the same line:
 	lastDeg = curDeg;
+}
+
+bool ANavAwareEnhancedBase::CheckCorner(const float& curDeg) const
+{
+	return curDeg >= minCurDeg || curDeg <= -minCurDeg;
+}
+
+template <typename T>
+bool ANavAwareEnhancedBase::CheckFakeCorner(T& curDeg, T& lastDeg) const
+{
+	const int Compensation = FMath::Abs(static_cast<float>(lastDeg) + static_cast<float>(curDeg));
+	return lastDeg != 0.f && Compensation <= minCompens;
 }
 

@@ -86,10 +86,25 @@ protected:
 	
 public:
 private:
-	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false) const;
-	void MarkCorner(TArray<FNavPoint>& InOutArray) const;
+	
 	/*
-	 * Takes into two edges: current & next, and calculate current edge's degree. In the meantime check if it is fake: use compensation of the last edge's degree and current edge's
+	 * Takes in an TArray<FNavigationWallEdge>, sorts element in the order of head & tail, into separate lines.
+	 */
+	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false) const;
+	
+	/*
+	 * Caller function to add corner & wall and so on information for an TArray<FNavPoint>;
+	 */
+	void MarkCorner(TArray<FNavPoint>& InOutArray) const;
+	
+	/*
+	 * Takes into two edges: current & next, and calculate current edge's degree.
+	 * In the meantime check if it is fake: use compensation of the last edge's degree and current edge's
 	 */
 	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8& i) const;
+	
+	bool CheckCorner(const float& curDeg) const;
+	
+	template <typename T>
+	bool CheckFakeCorner(T& curDeg, T& lastDeg) const;
 };
