@@ -15,7 +15,8 @@ enum class EWallType : uint8
 {
 	Wall,
 	Corner,
-	Entry
+	Entry,
+	FakeCorner,
 };
 
 USTRUCT(BlueprintType)
@@ -61,15 +62,24 @@ protected:
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
-	TArray<FNavPoint> TestEdges = {
-		FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavPoint(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f))};
+	TArray<FNavigationWallEdge> TestEdges2 = {
+		FNavigationWallEdge(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
+	FNavigationWallEdge(FVector(50.f, 50.f, 0.f), FVector(0.f, 50.f, 0.f)),
+	FNavigationWallEdge(FVector(0.f, 50.f, 0.f), FVector(0.f, 150.f, 0.f)),
+	FNavigationWallEdge(FVector(0.f, 150.f, 0.f), FVector(100.f, 150.f, 0.f)),
+	FNavigationWallEdge(FVector(100.f, 150.f, 0.f), FVector(100.f, 100.f, 0.f)),
+	FNavigationWallEdge(FVector(100.f, 100.f, 0.f), FVector(150.f, 100.f, 0.f)),
+	FNavigationWallEdge(FVector(150.f, 100.f, 0.f), FVector(150.f, 0.f, 0.f)),
+		FNavigationWallEdge(FVector(150.f, 0.f, 0.f), FVector(50.f, 0.f, 0.f))};
+	TArray<FNavigationWallEdge> TestEdges = {
+		FNavigationWallEdge(FVector(50.f, 50.f, 0.f), FVector(50.f, 0.f, 0.f)),
+	FNavigationWallEdge(FVector(50.f, 0.f, 0.f), FVector(0.f, 0.f, 0.f)),
+	FNavigationWallEdge(FVector(0.f, 0.f, 0.f), FVector(0.f, 150.f, 0.f)),
+	FNavigationWallEdge(FVector(0.f, 150.f, 0.f), FVector(100.f, 150.f, 0.f)),
+	FNavigationWallEdge(FVector(100.f, 150.f, 0.f), FVector(100.f, 100.f, 0.f)),
+	FNavigationWallEdge(FVector(100.f, 100.f, 0.f), FVector(150.f, 100.f, 0.f)),
+	FNavigationWallEdge(FVector(150.f, 100.f, 0.f), FVector(150.f, 50.f, 0.f)),
+	FNavigationWallEdge(FVector(150.f, 50.f, 0.f), FVector(50.f, 50.f, 0.f))};
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
 	bool bShowLog = false;
@@ -109,7 +119,7 @@ private:
 	 * Takes into two edges: current & next, and calculate current edge's degree.
 	 * In the meantime check if it is fake: use compensation of the last edge's degree and current edge's
 	 */
-	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8& i) const;
+	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const;
 	
 	bool CheckCorner(const float& curDeg) const;
 	
