@@ -56,7 +56,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 	}
 }
 
-void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug) const
+void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug)
 {
 	OutArray.Empty();
 	
@@ -231,8 +231,8 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 			lastDeg = 0.f;
 		}
 		
-		FString printstring = FString::Printf(TEXT("[%02d]Deg: %.2f, headindex: %d"), curEdge.EdgeID, curDeg, headerIndex);
-		DrawDebugString(GetWorld(), InOutArray[i].End + FVector(0.f,0.f,0.f), printstring, 0, FColor::White, 1.f, false, 1.f);
+		FString PrintString = FString::Printf(TEXT("[%02d]Deg: %.2f, headindex: %d"), curEdge.EdgeID, curDeg, headerIndex);
+		DrawDebugString(GetWorld(), InOutArray[i].End + FVector(0.f,0.f,0.f), PrintString, 0, FColor::White, 1.f, false, 1.f);
 	}
 	/*
 	 *End of the array, need to be dealt carefully*/
@@ -256,14 +256,14 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
 }
 
-void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& curEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const
+void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const
 {
-	FVector curVect = (curEdge.End - curEdge.Start).GetSafeNormal2D();
-	FVector nxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
-	curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(curVect, nxtVect))) * FMath::Sign(FVector::CrossProduct(curVect, nxtVect).Z);
-	curEdge.Degree = curDeg;
+	FVector CurVect = (CurEdge.End - CurEdge.Start).GetSafeNormal2D();
+	FVector NxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
+	curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(CurVect, NxtVect))) * FMath::Sign(FVector::CrossProduct(CurVect, NxtVect).Z);
+	CurEdge.Degree = curDeg;
 	
-	UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), curEdge.EdgeID, curEdge.Degree)
+	UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
 	
 	if (CheckCorner(curDeg))	//if this edge is a corner
 	{
@@ -272,14 +272,14 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 		// {
 		if (CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
 		{
-			InOutArray[i].Type = EWallType::FakeCorner;
+			CurEdge.Type = EWallType::FakeCorner;
 			InOutArray[i-1].Type = EWallType::FakeCorner;
-			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d][%02d], cur Deg: %1f, last Deg: %1f"), curEdge.EdgeID, InOutArray[i-1].EdgeID, curEdge.EdgeID, curDeg, lastDeg)
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d][%02d], cur Deg: %1f, last Deg: %1f"), CurEdge.EdgeID, InOutArray[i-1].EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
 		}
 		else  //this corner is ture
 		{
 			InOutArray[i].Type = EWallType::Corner;
-			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), curEdge.EdgeID, curEdge.EdgeID, curDeg, lastDeg)
+			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), CurEdge.EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
 			if (!bisEdging) bisEdging = true;
 		}
 	}
