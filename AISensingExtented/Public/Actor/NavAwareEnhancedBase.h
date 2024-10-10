@@ -10,13 +10,15 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(NavAware, Log, All);
 
+class ARecastNavMesh;
+
 UENUM(BlueprintType)
 enum class EWallType : uint8
 {
 	Wall,
-	Corner,
 	Entry,
 	FakeCorner,
+	Corner,
 };
 
 USTRUCT(BlueprintType)
@@ -54,6 +56,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
+	virtual void PostInitializeComponents() override;
+
 public:
 	virtual void Tick(float DeltaTime) override;
 	
@@ -86,6 +90,13 @@ protected:
 	
 public:
 private:
+	
+	UPROPERTY()
+	UNavigationSystemV1* MainNavSystem;
+	
+	UPROPERTY()
+	ARecastNavMesh* MainRecastNavMesh;
+	
 	/*
 	 * Takes in an TArray<FNavigationWallEdge>, sorts element in the order of head & tail, into separate lines.
 	 */
@@ -108,4 +119,13 @@ private:
 	
 	template <typename T>
 	bool CheckFakeCorner(T& curDeg, T& lastDeg) const;
+
+	/*
+	 * 
+	 */
+	void FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray);
+	/*Only can be used on edge!
+	 * Need to check if return vector if is zero vector!
+	 */
+	FVector GetNeiborVert(const FNavPoint& Edge, NavNodeRef* OutNavNodeRef);
 };

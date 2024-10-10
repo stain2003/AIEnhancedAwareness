@@ -17,6 +17,11 @@ void ANavAwareEnhancedBase::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ANavAwareEnhancedBase::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+}
+
 void ANavAwareEnhancedBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -24,16 +29,22 @@ void ANavAwareEnhancedBase::Tick(float DeltaTime)
 
 void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 {
-	if (const UNavigationSystemV1* NavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
+	MainNavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (MainNavSystem)
 	{
-		const ARecastNavMesh* RecastNavMesh = Cast<ARecastNavMesh>(NavSystem->GetDefaultNavDataInstance());
-		const NavNodeRef NodeRef = RecastNavMesh->FindNearestPoly(GetActorLocation(), FVector(500.f, 500.f, 500.f));
+		MainRecastNavMesh = Cast<ARecastNavMesh>(MainNavSystem->GetDefaultNavDataInstance());
+		const NavNodeRef NodeRef = MainRecastNavMesh->FindNearestPoly(GetActorLocation(), FVector(500.f, 500.f, 500.f));
 		TArray<FNavigationWallEdge> GetEdges;
 		
-		RecastNavMesh->FindEdges(NodeRef, GetActorLocation(), radius, NavSystem->CreateDefaultQueryFilterCopy(), GetEdges);
+		MainRecastNavMesh->FindEdges(NodeRef, GetActorLocation(), radius, MainNavSystem->CreateDefaultQueryFilterCopy(), GetEdges);
 		
 		GatherEdgesWithSorting(GetEdges, WallEdges, bDebug);
 		MarkCorner(WallEdges);
+		FilterOnlyInnerEdge(WallEdges);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("No RecastNavMesh availiable!"))
 	}
 	
 	/*
@@ -317,3 +328,30 @@ bool ANavAwareEnhancedBase::CheckFakeCorner(T& curDeg, T& lastDeg) const
 	return lastDeg != 0.f && Compensation < minCompens;
 }
 
+void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
+{
+	if (InOutArray.Num() == 0) return;
+
+	for (const auto curEdge : InOutArray)
+	{
+		if (curEdge.Type != EWallType::Corner) continue;
+		FVector polycenter = GetNeiborVert(curEdge, nullptr);
+		
+		DrawDebugBox(GetWorld(), polycenter, FVector(10.f, 10.f, 50.f), FColor::Yellow, false, 1.f);
+		DrawDebugDirectionalArrow(GetWorld(), (curEdge.Start + curEdge.End)/2, polycenter, 5.f, FColor::Yellow, false, 1.f);
+	}
+}
+
+FVector ANavAwareEnhancedBase::GetNeiborVert(const FNavPoint& Edge, NavNodeRef* OutNavNodeRef)
+{
+	FVector OutVector;
+	if (MainRecastNavMesh)
+	{
+		NavNodeRef Poly = MainRecastNavMesh->FindNearestPoly((Edge.Start + Edge.End)/2, FVector(50.f, 50.f, 50.f));
+		if (OutNavNodeRef) *OutNavNodeRef = Poly;
+		
+		MainRecastNavMesh->GetPolyCenter(Poly, OutVector);
+	}
+	
+	return OutVector;
+}
