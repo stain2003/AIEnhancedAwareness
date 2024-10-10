@@ -117,7 +117,7 @@ private:
 	
 	/*
 	 * Takes into two edges: current & next, and calculate current edge's degree.
-	 * In the meantime check if it is fake: use compensation of the last edge's degree and current edge's
+	 * In the meantime check if it is fake: use compensation of the 'last' edge's degree and 'current' edge's
 	 */
 	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const;
 	

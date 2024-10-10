@@ -173,10 +173,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 
 void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 {
-	if (InOutArray.Num() == 0)
-	{
-		return;
-	}
+	if (InOutArray.Num() == 0) return;
 	
 	/*
 	 * Filtering wall type
@@ -189,7 +186,6 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		if (currentElem.LineID != 0) break;
 		StartIndex++;
 	}
-
 	
 	float curDeg = 0.f;
 	float lastDeg = 0.f;
@@ -197,7 +193,8 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 	uint8 headerIndex = 0;
 	
 	/*
-	 *Main loop*/
+	 *****************************************************Main loop*****************************************************
+	 */
 	for(uint8 i = StartIndex; i < EndIndex; i++)	//note: 'i + 1' can be used safely
 	{
 		FNavPoint& curEdge = InOutArray[i];
@@ -208,13 +205,19 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		{
 			DetectCorner(InOutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
 		}
-		else
+		else//end of the line
 		{
 			//check if this line is a circle, and do corner detection for the end edge if so
 			if (curEdge.End == InOutArray[headerIndex].Start)
 			{
 				UE_LOG(LogTemp, Display, TEXT("This Line %d is a circle"), curEdge.LineID)
+
+				/*
+				 * 
+				 */
+				
 				FNavPoint& headEdge = InOutArray[headerIndex];
+				
 				DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, isEdging, i);
 				if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 				{
@@ -234,6 +237,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		FString PrintString = FString::Printf(TEXT("[%02d]Deg: %.2f, headindex: %d"), curEdge.EdgeID, curDeg, headerIndex);
 		DrawDebugString(GetWorld(), InOutArray[i].End + FVector(0.f,0.f,0.f), PrintString, 0, FColor::White, 1.f, false, 1.f);
 	}
+	
 	/*
 	 *End of the array, need to be dealt carefully*/
 	//if is a circle
@@ -247,9 +251,13 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		 * so if the next of the head edge is fake, is should be unmarked in order to keep 2 and 2 in the count of fake,
 		 * and on and on it will trigger a chain effect till the end.
 		 */
-		if (CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
+		if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 		{
-			curEdge.Type = EWallType::FakeCorner;
+			if (CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
+            {
+				headEdge.Type = EWallType::FakeCorner;
+            	curEdge.Type = EWallType::FakeCorner;
+            }
 		}
 	}
 	
