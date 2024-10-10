@@ -62,33 +62,15 @@ protected:
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
-	TArray<FNavigationWallEdge> TestEdges2 = {
-		FNavigationWallEdge(FVector(50.f, 0.f, 0.f), FVector(50.f, 50.f, 0.f)),
-	FNavigationWallEdge(FVector(50.f, 50.f, 0.f), FVector(0.f, 50.f, 0.f)),
-	FNavigationWallEdge(FVector(0.f, 50.f, 0.f), FVector(0.f, 150.f, 0.f)),
-	FNavigationWallEdge(FVector(0.f, 150.f, 0.f), FVector(100.f, 150.f, 0.f)),
-	FNavigationWallEdge(FVector(100.f, 150.f, 0.f), FVector(100.f, 100.f, 0.f)),
-	FNavigationWallEdge(FVector(100.f, 100.f, 0.f), FVector(150.f, 100.f, 0.f)),
-	FNavigationWallEdge(FVector(150.f, 100.f, 0.f), FVector(150.f, 0.f, 0.f)),
-		FNavigationWallEdge(FVector(150.f, 0.f, 0.f), FVector(50.f, 0.f, 0.f))};
-	TArray<FNavigationWallEdge> TestEdges = {
-		FNavigationWallEdge(FVector(50.f, 50.f, 0.f), FVector(50.f, 0.f, 0.f)),
-	FNavigationWallEdge(FVector(50.f, 0.f, 0.f), FVector(0.f, 0.f, 0.f)),
-	FNavigationWallEdge(FVector(0.f, 0.f, 0.f), FVector(0.f, 150.f, 0.f)),
-	FNavigationWallEdge(FVector(0.f, 150.f, 0.f), FVector(100.f, 150.f, 0.f)),
-	FNavigationWallEdge(FVector(100.f, 150.f, 0.f), FVector(100.f, 100.f, 0.f)),
-	FNavigationWallEdge(FVector(100.f, 100.f, 0.f), FVector(150.f, 100.f, 0.f)),
-	FNavigationWallEdge(FVector(150.f, 100.f, 0.f), FVector(150.f, 50.f, 0.f)),
-	FNavigationWallEdge(FVector(150.f, 50.f, 0.f), FVector(50.f, 50.f, 0.f))};
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
 	bool bShowLog = false;
 	/**/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	uint8 minCount = 0;
-	/**/
+	/*Min distance between two corner that can be marked as fake*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minCachedDegs = 50.f;
+	float minFakeCornerDist = 50.f;
 	/*Min degree required for a point to be recognized as a corner*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCurDeg = 35.f;
@@ -104,16 +86,17 @@ protected:
 	
 public:
 private:
-	
 	/*
 	 * Takes in an TArray<FNavigationWallEdge>, sorts element in the order of head & tail, into separate lines.
 	 */
-	static void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false);
-	
+	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false);
+	FCriticalSection GatherSortingEdgesSection;
+
 	/*
 	 * Caller function to add corner & wall and so on information for an TArray<FNavPoint>;
 	 */
-	void MarkCorner(TArray<FNavPoint>& InOutArray) const;
+	void MarkCorner(TArray<FNavPoint>& InOutArray);
+	FCriticalSection MarkingCornerSection;
 	
 	/*
 	 * Takes into two edges: current & next, and calculate current edge's degree.

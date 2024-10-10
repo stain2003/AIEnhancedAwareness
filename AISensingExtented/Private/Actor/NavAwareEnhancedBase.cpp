@@ -58,6 +58,8 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 
 void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug)
 {
+	FScopeLock Lock(&GatherSortingEdgesSection);
+	
 	OutArray.Empty();
 	
 	if(InArray.Num() == 0)
@@ -171,8 +173,11 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	UE_LOG(NavAware, Warning, TEXT("Finished sorting, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
 }
 
-void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
+void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 {
+	
+	FScopeLock Lock(&MarkingCornerSection);
+	
 	if (InOutArray.Num() == 0) return;
 	
 	/*
@@ -222,7 +227,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 				if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 				{
 					//check if two vectors are fake corners
-					if(CheckFakeCorner(headEdge.Degree, curEdge.Degree) && InOutArray[i-1].Type != EWallType::FakeCorner)
+					if((curEdge.End - curEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && InOutArray[i-1].Type != EWallType::FakeCorner)
 					{
 						curEdge.Type = EWallType::FakeCorner;
 						headEdge.Type = EWallType::FakeCorner;
@@ -253,7 +258,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray) const
 		 */
 		if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 		{
-			if (CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
+			if ((curEdge.End - curEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
             {
 				headEdge.Type = EWallType::FakeCorner;
             	curEdge.Type = EWallType::FakeCorner;
@@ -278,7 +283,7 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 		// const int Compensation = FMath::Abs(lastDeg + curDeg);
 		// if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
 		// {
-		if (CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
+		if ((CurEdge.End - CurEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
 		{
 			CurEdge.Type = EWallType::FakeCorner;
 			InOutArray[i-1].Type = EWallType::FakeCorner;
