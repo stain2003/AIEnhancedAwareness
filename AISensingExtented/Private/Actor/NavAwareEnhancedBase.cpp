@@ -18,11 +18,6 @@ void ANavAwareEnhancedBase::BeginPlay()
 	Super::BeginPlay();
 }
 
-void ANavAwareEnhancedBase::PostInitializeComponents()
-{
-	Super::PostInitializeComponents();
-}
-
 void ANavAwareEnhancedBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -56,7 +51,10 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
 			DrawDebugDirectionalArrow(GetWorld(), Start, End, 2.5f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
-			
+			if (Type == EWallType::Corner)
+			{
+				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Cyan, false, 1.f);
+			}
 			if (bShowLog)
 			{
 				//prints out all elements
@@ -276,12 +274,13 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 
 void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const
 {
-	FVector CurVect = (CurEdge.End - CurEdge.Start).GetSafeNormal2D();
-	FVector NxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
+	FVector CurVect = CurEdge.End - CurEdge.Start;
+	FVector NxtVect = nxtEdge.End - nxtEdge.Start;
 	curDeg = XYDegrees(CurVect, NxtVect);
+	//curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(CurVect, NxtVect))) * FMath::Sign(FVector::CrossProduct(CurVect, NxtVect).Z);
 	CurEdge.Degree = curDeg;
 	
-	UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
+	//UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
 	
 	if (CheckCorner(curDeg))	//if this edge is a corner
 	{
@@ -289,12 +288,12 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 		{
 			CurEdge.Type = EWallType::FakeCorner;
 			InOutArray[i-1].Type = EWallType::FakeCorner;
-			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d][%02d], cur Deg: %1f, last Deg: %1f"), CurEdge.EdgeID, InOutArray[i-1].EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
+			//UE_LOG(LogTemp, Display, TEXT("[%02d]Found a fake corner: Edge[%02d][%02d], cur Deg: %1f, last Deg: %1f"), CurEdge.EdgeID, InOutArray[i-1].EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
 		}
 		else  //this corner is ture
 		{
 			InOutArray[i].Type = EWallType::Corner;
-			UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), CurEdge.EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
+			//UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), CurEdge.EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
 			if (!bisEdging) bisEdging = true;
 		}
 	}
@@ -323,13 +322,19 @@ void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
 {
 	if (InOutArray.Num() == 0) return;
 
-	for (const auto curEdge : InOutArray)
+	for (auto& CurEdge : InOutArray)
 	{
-		if (curEdge.Type != EWallType::Corner) continue;
-		FVector polycenter = GetNeiborVert(curEdge, nullptr);
+		if (CurEdge.Type != EWallType::Corner) continue;
+		FVector PolyCenter = GetNeiborVert(CurEdge, nullptr);
 		
-		DrawDebugBox(GetWorld(), polycenter, FVector(10.f, 10.f, 50.f), FColor::Yellow, false, 1.f);
-		DrawDebugDirectionalArrow(GetWorld(), (curEdge.Start + curEdge.End)/2, polycenter, 5.f, FColor::Yellow, false, 1.f);
+		FVector CurVect = CurEdge.End - CurEdge.Start;
+		FVector StartToCenter = PolyCenter - CurEdge.Start;
+		const float DegToPolyCenter = XYDegrees(CurVect, StartToCenter);
+
+		if (CurEdge.Degree * DegToPolyCenter >= 0.f)
+		{
+			CurEdge.Type = EWallType::Wall;
+		}
 	}
 }
 
