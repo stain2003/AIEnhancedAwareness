@@ -3,6 +3,7 @@
 #include "NavigationSystem.h"
 #include "AI/NavigationSystemBase.h"
 #include "NavMesh/RecastNavMesh.h"
+#include "StainMathLibrary.h"
 
 DEFINE_LOG_CATEGORY(NavAware);
 
@@ -226,19 +227,12 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 			//check if this line is a circle, and do corner detection for the end edge if so
 			if (curEdge.End == InOutArray[headerIndex].Start)
 			{
-				UE_LOG(LogTemp, Display, TEXT("This Line %d is a circle"), curEdge.LineID)
-
-				/*
-				 * 
-				 */
-				
 				FNavPoint& headEdge = InOutArray[headerIndex];
-				
 				DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, isEdging, i);
 				if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 				{
 					//check if two vectors are fake corners
-					if((curEdge.End - curEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && InOutArray[i-1].Type != EWallType::FakeCorner)
+					if((curEdge.End - curEdge.Start).Length() <= maxDistForFakeCorner && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && InOutArray[i-1].Type != EWallType::FakeCorner)
 					{
 						curEdge.Type = EWallType::FakeCorner;
 						headEdge.Type = EWallType::FakeCorner;
@@ -269,7 +263,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 		 */
 		if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 		{
-			if ((curEdge.End - curEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
+			if ((curEdge.End - curEdge.Start).Length() <= maxDistForFakeCorner && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
             {
 				headEdge.Type = EWallType::FakeCorner;
             	curEdge.Type = EWallType::FakeCorner;
@@ -284,17 +278,14 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 {
 	FVector CurVect = (CurEdge.End - CurEdge.Start).GetSafeNormal2D();
 	FVector NxtVect = (nxtEdge.End - nxtEdge.Start).GetSafeNormal2D();
-	curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(CurVect, NxtVect))) * FMath::Sign(FVector::CrossProduct(CurVect, NxtVect).Z);
+	curDeg = XYDegrees(CurVect, NxtVect);
 	CurEdge.Degree = curDeg;
 	
 	UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
 	
 	if (CheckCorner(curDeg))	//if this edge is a corner
 	{
-		// const int Compensation = FMath::Abs(lastDeg + curDeg);
-		// if (lastDeg != 0.f && Compensation < minCompens)	//if this edge is a fake corner, redo last edge
-		// {
-		if ((CurEdge.End - CurEdge.Start).Length() <= minFakeCornerDist && CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
+		if ((CurEdge.End - CurEdge.Start).Length() <= maxDistForFakeCorner && CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
 		{
 			CurEdge.Type = EWallType::FakeCorner;
 			InOutArray[i-1].Type = EWallType::FakeCorner;

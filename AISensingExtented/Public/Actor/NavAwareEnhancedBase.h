@@ -72,13 +72,15 @@ protected:
 	/**/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	uint8 minCount = 0;
-	/*Min distance between two corner that can be marked as fake*/
+	/*Max distance between two corner that can be marked as fake
+	 * larger than which will not be checked for fake corners
+	 */
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float minFakeCornerDist = 50.f;
-	/*Min degree required for a point to be recognized as a corner*/
+	float maxDistForFakeCorner = 250.f;
+	/*Min degree required for a point that can be marked as a corner*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCurDeg = 35.f;
-	/*Min compensation of current and last degree under which will be recognize the current and the last point is not a corner*/
+	/*Min compensation: added up of two degrees that smaller than this will be marked as fake*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCompens = 45.f;
 
