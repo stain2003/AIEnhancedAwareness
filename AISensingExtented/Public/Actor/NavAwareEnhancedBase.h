@@ -46,6 +46,12 @@ struct FNavPoint
 
 	FNavPoint* PrevEdge;
 	FNavPoint* NextEdge;
+
+	FORCEINLINE FNavPoint(FVector inStart = FVector::ZeroVector, FVector inEnd = FVector::ZeroVector,
+		uint8 inEdgeID = 0, uint8 inLineID = 0, EWallType inType = EWallType::Wall, float inDegree = 0.f, FNavPoint* inPrevEdge = nullptr, FNavPoint* inNextEdge = nullptr)
+		: Start(inStart), End(inEnd), EdgeID(inEdgeID), LineID(inLineID), Type(inType), Degree(inDegree), PrevEdge(inPrevEdge), NextEdge(inNextEdge)
+	{
+	}
 };
 
 UCLASS()
@@ -107,7 +113,7 @@ private:
 	FCriticalSection GatherSortingEdgesSection;
 
 	/*
-	 * 
+	 * Make array a chain that every edge contains address of their prev and next edge
 	 */
 	void EdgeLinker(TArray<FNavPoint>& InOutArray);
 
@@ -119,12 +125,20 @@ private:
 	
 	/*
 	 * Takes into two edges: current & next, and calculate current edge's degree.
-	 * In the meantime check if it is fake: use compensation of the 'last' edge's degree and 'current' edge's
+	 * In the meantime check if it is fake
 	 */
-	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, uint8 i) const;
+	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& NextEdge, FNavPoint& LastEdge, float& curDeg, float& lastDeg, uint8 i) const;
 	
-	bool CheckCorner(const float& curDeg) const;
-	
+	FORCEINLINE bool CheckCorner(const float& curDeg) const
+	{
+		return curDeg >= minCurDeg || curDeg <= -minCurDeg;
+	};
+
+	/*
+	 * Check if current corner is fake, when last degree != 0.f,
+	 * in another word, this edge is not the first of the current array/line,
+	 * use compensation of the 'last' edge's degree and 'current' edge's
+	 */
 	template <typename T>
 	bool CheckFakeCorner(T& curDeg, T& lastDeg) const;
 

@@ -38,7 +38,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		EdgeLinker(WallEdges);
 		MarkCorner(WallEdges);
 		FilterOnlyInnerEdge(WallEdges);
-		MarkEntry(WallEdges);
+		//MarkEntry(WallEdges);
 	}
 	else
 	{
@@ -255,11 +255,33 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	float curDeg = 0.f;
 	float lastDeg = 0.f;
 	uint8 headerIndex = 0;
+	uint8 Num = InOutArray.Num();
+	for (uint8 i = StartIndex; i < Num; i++)
+	{
+		FNavPoint& CurEdge = InOutArray[i];
+		FNavPoint* NextEdge = nullptr;
+		FNavPoint* PrevEdge = nullptr;
+		if (CurEdge.NextEdge) NextEdge = CurEdge.NextEdge;
+		if (CurEdge.PrevEdge) PrevEdge = CurEdge.PrevEdge;
+		
+		if (i < Num - 1 && CurEdge.LineID != InOutArray[i+1].LineID)
+		{
+			lastDeg = 0.f;
+		}
+		
+		if (NextEdge != nullptr)	//when not reach to the end of the line/array
+		{
+			if (PrevEdge)
+			{
+				DetectCorner(InOutArray, CurEdge, *NextEdge, *PrevEdge, curDeg, lastDeg, i);
+			}
+		}
+	}
 	
 	/*
 	 *****************************************************Main loop*****************************************************
 	 */
-	for(uint8 i = StartIndex; i < EndIndex; i++)	//note: 'i + 1' can be used safely
+	/*for(uint8 i = StartIndex; i < EndIndex; i++)	//note: 'i + 1' can be used safely
 	{
 		FNavPoint& curEdge = InOutArray[i];
 		FNavPoint& nxtEdge = InOutArray[i+1];
@@ -296,7 +318,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	}
 	
 	/*
-	 *End of the array, need to be dealt carefully*/
+	 *End of the array, need to be dealt carefully#1#
 	//if is a circle
 	FNavPoint& curEdge = InOutArray.Last();
 	FNavPoint& headEdge = InOutArray[headerIndex];
@@ -307,7 +329,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 		 * is because when head edge is marked as fake, and if the tail edge is also fake, that will be 2 of fake in a row,
 		 * so if the next of the head edge is fake, is should be unmarked in order to keep 2 and 2 in the count of fake,
 		 * and on and on it will trigger a chain effect till the end.
-		 */
+		 #1#
 		if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 		{
 			if ((curEdge.End - curEdge.Start).Length() <= maxDistForFakeCorner && CheckFakeCorner(headEdge.Degree, curEdge.Degree) && headEdge.Type != EWallType::FakeCorner)
@@ -316,24 +338,26 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
             	curEdge.Type = EWallType::FakeCorner;
             }
 		}
-	}
+	}*/
+
+	
 	
 	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
 }
 
-void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, uint8 i) const
+void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& NextEdge, FNavPoint& LastEdge, float& curDeg, float& lastDeg, uint8 i) const
 {
 	FVector CurVect = CurEdge.End - CurEdge.Start;
-	FVector NxtVect = nxtEdge.End - nxtEdge.Start;
+	FVector NxtVect = NextEdge.End - NextEdge.Start;
 	curDeg = XYDegrees(CurVect, NxtVect);
 	//curDeg = FMath::RadiansToDegrees(FMath::Acos(FVector::DotProduct(CurVect, NxtVect))) * FMath::Sign(FVector::CrossProduct(CurVect, NxtVect).Z);
 	CurEdge.Degree = curDeg;
 	
 	//UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
 	
-	if (CheckCorner(curDeg))	//if this edge is a corner
+	/*if (CheckCorner(curDeg))	//if this edge is a corner
 	{
-		if ((CurEdge.End - CurEdge.Start).Length() <= maxDistForFakeCorner && CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
+		if (CurVect.Length() <= maxDistForFakeCorner && CheckFakeCorner(curDeg, lastDeg) && InOutArray[i-1].Type != EWallType::FakeCorner)
 		{
 			CurEdge.Type = EWallType::FakeCorner;
 			InOutArray[i-1].Type = EWallType::FakeCorner;
@@ -341,18 +365,29 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 		}
 		else  //this corner is ture
 		{
-			InOutArray[i].Type = EWallType::Corner;
+			CurEdge.Type = EWallType::Corner;
 			//UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), CurEdge.EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
 		}
+	}*/
+
+	if (CheckCorner(curDeg))
+	{
+		//We don't check if LastEdge is nullptr directly,
+		//We checked it in CheckFakeCorner():
+		//When LastDeg is equal to 0, we skip calling LastEdge
+		//LastDeg is handled back in MarkCorner
+		if (CurVect.Length() <= maxDistForFakeCorner && CheckFakeCorner(curDeg, lastDeg) && LastEdge.Type != EWallType::FakeCorner)
+		{
+			CurEdge.Type = EWallType::FakeCorner;
+			LastEdge.Type = EWallType::FakeCorner;
+		}
+		else
+		{
+			CurEdge.Type = EWallType::Corner;
+		}
 	}
-	
 	//do every edge when in the same line:
 	lastDeg = curDeg;
-}
-
-bool ANavAwareEnhancedBase::CheckCorner(const float& curDeg) const
-{
-	return curDeg >= minCurDeg || curDeg <= -minCurDeg;
 }
 
 template <typename T>
@@ -364,6 +399,8 @@ bool ANavAwareEnhancedBase::CheckFakeCorner(T& curDeg, T& lastDeg) const
 
 void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
 {
+	FScopeLock Lock(&FilterSection);
+	
 	if (InOutArray.Num() == 0) return;
 
 	for (auto& CurEdge : InOutArray)
