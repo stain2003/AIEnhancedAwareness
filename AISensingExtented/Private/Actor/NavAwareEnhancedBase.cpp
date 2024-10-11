@@ -35,6 +35,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		MainRecastNavMesh->FindEdges(NodeRef, GetActorLocation(), radius, MainNavSystem->CreateDefaultQueryFilterCopy(), GetEdges);
 		
 		GatherEdgesWithSorting(GetEdges, WallEdges, bDebug);
+		EdgeLinker(WallEdges);
 		MarkCorner(WallEdges);
 		FilterOnlyInnerEdge(WallEdges);
 		MarkEntry(WallEdges);
@@ -63,9 +64,14 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 			if (bShowLog)
 			{
 				//prints out all elements
+				uint8 PrevID = 0;
+				uint8 NextID = 0;
+				if (Prev) PrevID = Prev->EdgeID;
+				if (Next) NextID = Next->EdgeID;
+				
 				UE_LOG(NavAware, Display,
-					TEXT("[Start: [%.0f, %.0f], End: [%.0f, %.0f], ID: %02d, LineID: %d, Type: %d, Degree: %.2f]"),
-					Start.X, Start.Y, End.X, End.Y, ID, LineID, Type, Degree)
+                    TEXT("[Start: [%.0f, %.0f], End: [%.0f, %.0f], ID: %02d, LineID: %d, Type: %d, Degree: %.2f, Prev: [%02d], Next: [%02d]]"),
+                    Start.X, Start.Y, End.X, End.Y, ID, LineID, Type, Degree, PrevID, NextID)
 			}
 		}
 	}
@@ -192,23 +198,38 @@ void ANavAwareEnhancedBase::EdgeLinker(TArray<FNavPoint>& InOutArray)
 {
 	if (InOutArray.Num() == 0) return;
 
+	uint8 LineHeader = 0;
 	const uint8 Num = InOutArray.Num();
 	for (uint8 i = 0; i < Num - 1; i++)
 	{
-		if (InOutArray[i].LineID == 0) continue;
+		if (InOutArray[i].LineID == 0) {LineHeader++; continue;}
 
 		FNavPoint& CurEdge = InOutArray[i];
-		FNavPoint& NxtEdge = InOutArray[i];
+		FNavPoint& NxtEdge = InOutArray[i+1];
 		
 		if (CurEdge.LineID == NxtEdge.LineID)
 		{
 			CurEdge.NextEdge = &NxtEdge;
 			NxtEdge.PrevEdge = &CurEdge;
 		}
-		else
+		else//end of the current line
 		{
-			
+			FNavPoint& HeadEdge = InOutArray[LineHeader];
+			if (CurEdge.End == HeadEdge.Start)	//check if line is circle
+			{
+				CurEdge.NextEdge = &HeadEdge;
+				HeadEdge.PrevEdge = &CurEdge;
+			}
+			LineHeader = i + 1;
 		}
+	}
+	//End of the array
+	FNavPoint& CurEdge = InOutArray.Last();
+	FNavPoint& HeadEdge = InOutArray[LineHeader];
+	if (CurEdge.End == HeadEdge.Start)	//check if line is circle
+	{
+		CurEdge.NextEdge = &HeadEdge;
+		HeadEdge.PrevEdge = &CurEdge;
 	}
 }
 
@@ -394,7 +415,6 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 		
 		FNavPoint& CurEdge = InOutArray[i];
 		FNavPoint& NxtEdge = InOutArray[i+1];
-		UE_LOG(LogTemp, Warning, TEXT("Cheking entries: [%02d]"), CurEdge.EdgeID)
 		if (CurEdge.LineID == NxtEdge.LineID)
 		{
 			if (CurEdge.Type < EWallType::Corner && NxtEdge.Type == EWallType::Corner)
@@ -409,7 +429,7 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 		else // reach the end of the current line
 		{
 			FNavPoint& HeadEdge = InOutArray[LineHeader];
-			if (CurEdge.LineID == HeadEdge.LineID)	//if this line is circle, check CurEdge and HeadEdge for entry
+			if (CurEdge.End == HeadEdge.Start)	//if this line is circle, check CurEdge and HeadEdge for entry
 			{
 				if (CurEdge.Type < EWallType::Corner && HeadEdge.Type == EWallType::Corner)
 				{
@@ -427,7 +447,7 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 	FNavPoint& CurEdge = InOutArray.Last();
 	FNavPoint& HeadEdge = InOutArray[LineHeader];
 	UE_LOG(LogTemp, Warning, TEXT("Cheking entries: [%02d]"), CurEdge.EdgeID)
-	if (CurEdge.LineID == HeadEdge.LineID)	//if this line is circle, check CurEdge and HeadEdge for entry
+	if (CurEdge.End == HeadEdge.Start)	//if this line is circle, check CurEdge and HeadEdge for entry
 	{
 		if (CurEdge.Type < EWallType::Corner && HeadEdge.Type == EWallType::Corner)
 		{
