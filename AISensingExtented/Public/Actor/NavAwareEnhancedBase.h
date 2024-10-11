@@ -70,23 +70,34 @@ public:
 	
 /*Navigation*/
 protected:
+	UPROPERTY()
+	UNavigationSystemV1* MainNavSystem;
+	
+	UPROPERTY()
+	ARecastNavMesh* MainRecastNavMesh;
+	
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
+	
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
 	bool bShowLog = false;
+	
 	/**/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	uint8 minCount = 0;
+	
 	/*Max distance between two corner that can be marked as fake
 	 * larger than which will not be checked for fake corners
 	 */
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float maxDistForFakeCorner = 250.f;
+	
 	/*Min degree required for a point that can be marked as a corner*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCurDeg = 35.f;
+	
 	/*Min compensation: added up of two degrees that smaller than this will be marked as fake*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCompens = 45.f;
@@ -99,12 +110,6 @@ protected:
 	
 public:
 private:
-	
-	UPROPERTY()
-	UNavigationSystemV1* MainNavSystem;
-	
-	UPROPERTY()
-	ARecastNavMesh* MainRecastNavMesh;
 	
 	/*
 	 * Takes in an TArray<FNavigationWallEdge>, sorts element in the order of head & tail, into separate lines.
@@ -140,7 +145,11 @@ private:
 	 * use compensation of the 'last' edge's degree and 'current' edge's
 	 */
 	template <typename T>
-	bool CheckFakeCorner(T& curDeg, T& lastDeg) const;
+	FORCEINLINE bool CheckFakeCorner(T& curDeg, T& lastDeg) const
+	{
+		const float Compensation = FMath::Abs(static_cast<float>(lastDeg) + static_cast<float>(curDeg));
+		return lastDeg != 0.f && Compensation < minCompens;
+	}
 
 	/*
 	 * Filter out the outer edges from a curves, which won't be needed to calculate the cross road entries
@@ -151,7 +160,19 @@ private:
 	/*Only can be used on edge!
 	 * Need to check if return vector if is zero vector!
 	 */
-	FVector GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly = nullptr);
+	FORCEINLINE FVector GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly = nullptr)
+	{
+		FVector OutVector;
+		if (MainRecastNavMesh)
+		{
+			NavNodeRef Poly = MainRecastNavMesh->FindNearestPoly((Edge.Start + Edge.End)/2, FVector(50.f, 50.f, 50.f));
+			if (OutPoly) *OutPoly = Poly;
+		
+			MainRecastNavMesh->GetPolyCenter(Poly, OutVector);
+		}
+	
+		return OutVector;
+	}
 
 	/*
 	 * Mark road entries
