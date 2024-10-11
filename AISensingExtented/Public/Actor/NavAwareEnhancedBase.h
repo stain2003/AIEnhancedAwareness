@@ -16,9 +16,9 @@ UENUM(BlueprintType)
 enum class EWallType : uint8
 {
 	Wall,
-	Entry,
 	FakeCorner,
 	Corner,
+	Entry,
 };
 
 USTRUCT(BlueprintType)
@@ -43,6 +43,9 @@ struct FNavPoint
 
 	UPROPERTY(BlueprintReadWrite, Category="Navigation")
 	float Degree = 0;
+
+	FNavPoint* PrevEdge;
+	FNavPoint* NextEdge;
 };
 
 UCLASS()
@@ -104,6 +107,11 @@ private:
 	FCriticalSection GatherSortingEdgesSection;
 
 	/*
+	 * 
+	 */
+	void EdgeLinker(TArray<FNavPoint>& InOutArray);
+
+	/*
 	 * Caller function to add corner & wall and so on information for an TArray<FNavPoint>;
 	 */
 	void MarkCorner(TArray<FNavPoint>& InOutArray);
@@ -113,7 +121,7 @@ private:
 	 * Takes into two edges: current & next, and calculate current edge's degree.
 	 * In the meantime check if it is fake: use compensation of the 'last' edge's degree and 'current' edge's
 	 */
-	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const;
+	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, uint8 i) const;
 	
 	bool CheckCorner(const float& curDeg) const;
 	
@@ -121,11 +129,19 @@ private:
 	bool CheckFakeCorner(T& curDeg, T& lastDeg) const;
 
 	/*
-	 * 
+	 * Filter out the outer edges from a curves, which won't be needed to calculate the cross road entries
 	 */
 	void FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray);
+	FCriticalSection FilterSection;
+	
 	/*Only can be used on edge!
 	 * Need to check if return vector if is zero vector!
 	 */
-	FVector GetNeiborVert(const FNavPoint& Edge, NavNodeRef* OutNavNodeRef);
+	FVector GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly = nullptr);
+
+	/*
+	 * Mark road entries
+	 */
+	void MarkEntry(TArray<FNavPoint>& InOutArray);
+	FCriticalSection MarkingEntrySection;
 };

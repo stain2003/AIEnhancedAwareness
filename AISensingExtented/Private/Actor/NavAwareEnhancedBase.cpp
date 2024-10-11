@@ -37,6 +37,7 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		GatherEdgesWithSorting(GetEdges, WallEdges, bDebug);
 		MarkCorner(WallEdges);
 		FilterOnlyInnerEdge(WallEdges);
+		MarkEntry(WallEdges);
 	}
 	else
 	{
@@ -47,13 +48,17 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 	 *Debugger*/
 	if (bDebug)
 	{
-		for (auto& [Start, End, ID, LineID, Type, Degree] : WallEdges)
+		for (auto& [Start, End, ID, LineID, Type, Degree, Prev, Next] : WallEdges)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
 			DrawDebugDirectionalArrow(GetWorld(), Start, End, 2.5f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
 			if (Type == EWallType::Corner)
 			{
 				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Cyan, false, 1.f);
+			}
+			else if (Type == EWallType::Entry)
+			{
+				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Purple, false, 1.f);
 			}
 			if (bShowLog)
 			{
@@ -183,6 +188,30 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	UE_LOG(NavAware, Warning, TEXT("Finished sorting, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
 }
 
+void ANavAwareEnhancedBase::EdgeLinker(TArray<FNavPoint>& InOutArray)
+{
+	if (InOutArray.Num() == 0) return;
+
+	const uint8 Num = InOutArray.Num();
+	for (uint8 i = 0; i < Num - 1; i++)
+	{
+		if (InOutArray[i].LineID == 0) continue;
+
+		FNavPoint& CurEdge = InOutArray[i];
+		FNavPoint& NxtEdge = InOutArray[i];
+		
+		if (CurEdge.LineID == NxtEdge.LineID)
+		{
+			CurEdge.NextEdge = &NxtEdge;
+			NxtEdge.PrevEdge = &CurEdge;
+		}
+		else
+		{
+			
+		}
+	}
+}
+
 void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 {
 	
@@ -204,7 +233,6 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	
 	float curDeg = 0.f;
 	float lastDeg = 0.f;
-	bool isEdging = false;
 	uint8 headerIndex = 0;
 	
 	/*
@@ -218,7 +246,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 		//Check if reach the end of the line yet 
 		if (curEdge.LineID == nxtEdge.LineID)
 		{
-			DetectCorner(InOutArray, curEdge, nxtEdge, curDeg, lastDeg, isEdging, i);
+			DetectCorner(InOutArray, curEdge, nxtEdge, curDeg, lastDeg, i);
 		}
 		else//end of the line
 		{
@@ -226,7 +254,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 			if (curEdge.End == InOutArray[headerIndex].Start)
 			{
 				FNavPoint& headEdge = InOutArray[headerIndex];
-				DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, isEdging, i);
+				DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, i);
 				if (curEdge.Type == EWallType::Corner && headEdge.Type == EWallType::Corner)
 				{
 					//check if two vectors are fake corners
@@ -253,7 +281,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	FNavPoint& headEdge = InOutArray[headerIndex];
 	if (curEdge.End == headEdge.Start)
 	{
-		DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, isEdging, InOutArray.Num() - 1);
+		DetectCorner(InOutArray, curEdge, headEdge, curDeg, lastDeg, InOutArray.Num() - 1);
 		/*The reason why I check the head edge if is not already marked as fake instead checking the last edge,
 		 * is because when head edge is marked as fake, and if the tail edge is also fake, that will be 2 of fake in a row,
 		 * so if the next of the head edge is fake, is should be unmarked in order to keep 2 and 2 in the count of fake,
@@ -272,7 +300,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
 }
 
-void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, bool& bisEdging, uint8 i) const
+void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& nxtEdge, float& curDeg, float& lastDeg, uint8 i) const
 {
 	FVector CurVect = CurEdge.End - CurEdge.Start;
 	FVector NxtVect = nxtEdge.End - nxtEdge.Start;
@@ -294,12 +322,7 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 		{
 			InOutArray[i].Type = EWallType::Corner;
 			//UE_LOG(LogTemp, Display, TEXT("[%02d]Found a corner: Edge[%02d], cur Deg: %1f, last Deg: %1f!"), CurEdge.EdgeID, CurEdge.EdgeID, curDeg, lastDeg)
-			if (!bisEdging) bisEdging = true;
 		}
-	}
-	else //if this edge is not a corner
-	{
-		if (bisEdging)	bisEdging = false;
 	}
 	
 	//do every edge when in the same line:
@@ -325,7 +348,7 @@ void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
 	for (auto& CurEdge : InOutArray)
 	{
 		if (CurEdge.Type != EWallType::Corner) continue;
-		FVector PolyCenter = GetNeiborVert(CurEdge, nullptr);
+		FVector PolyCenter = GetEdgePolyCenter(CurEdge);
 		
 		FVector CurVect = CurEdge.End - CurEdge.Start;
 		FVector StartToCenter = PolyCenter - CurEdge.Start;
@@ -338,16 +361,83 @@ void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
 	}
 }
 
-FVector ANavAwareEnhancedBase::GetNeiborVert(const FNavPoint& Edge, NavNodeRef* OutNavNodeRef)
+FVector ANavAwareEnhancedBase::GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly)
 {
 	FVector OutVector;
 	if (MainRecastNavMesh)
 	{
 		NavNodeRef Poly = MainRecastNavMesh->FindNearestPoly((Edge.Start + Edge.End)/2, FVector(50.f, 50.f, 50.f));
-		if (OutNavNodeRef) *OutNavNodeRef = Poly;
+		if (OutPoly) *OutPoly = Poly;
 		
 		MainRecastNavMesh->GetPolyCenter(Poly, OutVector);
 	}
 	
 	return OutVector;
+}
+
+void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
+{
+	FScopeLock Lock(&MarkingEntrySection);
+
+	//if num is 0 or 1, theres no need to mark
+	uint8 Num = InOutArray.Num();
+	if (Num < 2) return;
+	uint8 LineHeader = 0;
+	for (int i = 0; i < InOutArray.Num() - 1; i++)
+	{
+		//skip edge in line '0'
+		if (InOutArray[i].LineID == 0)
+		{
+			LineHeader++;
+			continue;
+		}
+		
+		FNavPoint& CurEdge = InOutArray[i];
+		FNavPoint& NxtEdge = InOutArray[i+1];
+		UE_LOG(LogTemp, Warning, TEXT("Cheking entries: [%02d]"), CurEdge.EdgeID)
+		if (CurEdge.LineID == NxtEdge.LineID)
+		{
+			if (CurEdge.Type < EWallType::Corner && NxtEdge.Type == EWallType::Corner)
+			{
+				CurEdge.Type = EWallType::Entry;
+			}
+			else if (CurEdge.Type == EWallType::Corner && NxtEdge.Type < EWallType::Corner)
+			{
+				NxtEdge.Type = EWallType::Entry;
+			}
+		}
+		else // reach the end of the current line
+		{
+			FNavPoint& HeadEdge = InOutArray[LineHeader];
+			if (CurEdge.LineID == HeadEdge.LineID)	//if this line is circle, check CurEdge and HeadEdge for entry
+			{
+				if (CurEdge.Type < EWallType::Corner && HeadEdge.Type == EWallType::Corner)
+				{
+					CurEdge.Type = EWallType::Entry;
+				}
+				else if (CurEdge.Type == EWallType::Corner && HeadEdge.Type < EWallType::Corner)
+				{
+					HeadEdge.Type = EWallType::Entry;
+				}
+			}
+			LineHeader = i + 1;
+		}
+	}
+	// for the very last of the edge
+	FNavPoint& CurEdge = InOutArray.Last();
+	FNavPoint& HeadEdge = InOutArray[LineHeader];
+	UE_LOG(LogTemp, Warning, TEXT("Cheking entries: [%02d]"), CurEdge.EdgeID)
+	if (CurEdge.LineID == HeadEdge.LineID)	//if this line is circle, check CurEdge and HeadEdge for entry
+	{
+		if (CurEdge.Type < EWallType::Corner && HeadEdge.Type == EWallType::Corner)
+		{
+			CurEdge.Type = EWallType::Entry;
+		}
+		else if (CurEdge.Type == EWallType::Corner && HeadEdge.Type < EWallType::Corner)
+		{
+			HeadEdge.Type = EWallType::Entry;
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("Finished marking entries of the corner!"))
 }

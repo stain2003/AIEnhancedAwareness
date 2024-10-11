@@ -10,9 +10,3 @@ static FORCEINLINE float XYDegrees(FVector const& A, FVector const& B)
 	return FMath::RadiansToDegrees(
 		FMath::Acos(FVector::DotProduct(FVector(ANormal.X, ANormal.Y, 0.f), FVector(BNormal.X, BNormal.Y, 0.f)))) * FMath::Sign(FVector::CrossProduct(A, B).Z);
 }
-
-
-static constexpr FORCEINLINE double XYDegrees(double const& RadVal)
-{
-	return RadVal * (180.0 / UE_DOUBLE_PI);
-}
