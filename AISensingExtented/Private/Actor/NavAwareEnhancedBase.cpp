@@ -53,6 +53,10 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
 			DrawDebugDirectionalArrow(GetWorld(), Start, End, 2.5f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
+			
+			FString PrintString = FString::Printf(TEXT("[%d][%02d]Deg: %.2f"), LineID, ID, Degree);
+			DrawDebugString(GetWorld(), End + FVector(0.f,0.f,0.f), PrintString, 0, FColor::White, 1.f, false, 1.f);
+			
 			if (Type == EWallType::Corner)
 			{
 				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Cyan, false, 1.f);
@@ -245,7 +249,6 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	 */
 	//Define the start index, to skip LineID '0'
 	uint8 StartIndex = 0;
-	uint8 EndIndex = InOutArray.Num() - 1;
 	for (auto& currentElem : InOutArray)
 	{
 		if (currentElem.LineID != 0) break;
@@ -254,27 +257,24 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 	
 	float curDeg = 0.f;
 	float lastDeg = 0.f;
-	uint8 headerIndex = 0;
 	uint8 Num = InOutArray.Num();
-	for (uint8 i = StartIndex; i < Num; i++)
+	for (uint8 i = StartIndex; i < Num; i++)	//loop through every element
 	{
 		FNavPoint& CurEdge = InOutArray[i];
 		FNavPoint* NextEdge = nullptr;
 		FNavPoint* PrevEdge = nullptr;
 		if (CurEdge.NextEdge) NextEdge = CurEdge.NextEdge;
 		if (CurEdge.PrevEdge) PrevEdge = CurEdge.PrevEdge;
-		
-		if (i < Num - 1 && CurEdge.LineID != InOutArray[i+1].LineID)
+
+		//reset lastDeg when entering a new line
+		if (i > 0 && CurEdge.LineID != InOutArray[i - 1].LineID)
 		{
 			lastDeg = 0.f;
 		}
 		
 		if (NextEdge != nullptr)	//when not reach to the end of the line/array
 		{
-			if (PrevEdge)
-			{
-				DetectCorner(InOutArray, CurEdge, *NextEdge, *PrevEdge, curDeg, lastDeg, i);
-			}
+			DetectCorner(InOutArray, CurEdge, *NextEdge, *PrevEdge, curDeg, lastDeg, i);
 		}
 	}
 	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
@@ -285,9 +285,8 @@ void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoin
 	FVector CurVect = CurEdge.End - CurEdge.Start;
 	FVector NxtVect = NextEdge.End - NextEdge.Start;
 	curDeg = XYDegrees(CurVect, NxtVect);
-	CurEdge.Degree = curDeg;
 	
-	//UE_LOG(LogTemp, Display, TEXT("[%02d]Current Deg = %.2f"), CurEdge.EdgeID, CurEdge.Degree)
+	CurEdge.Degree = curDeg;
 	
 	if (CheckCorner(curDeg))
 	{
