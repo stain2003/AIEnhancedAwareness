@@ -42,14 +42,14 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("No RecastNavMesh availiable!"))
+		UE_LOG(NavAware, Error, TEXT("No RecastNavMesh availiable!"))
 	}
 	
 	/*
 	 *Debugger*/
 	if (bDebug)
 	{
-		for (auto& [Start, End, ID, LineID, Type, Degree, Prev, Next] : WallEdges)
+		for (const auto&  [Start, End, ID, LineID, Type, Degree, Prev, Next] : WallEdges)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
 			DrawDebugDirectionalArrow(GetWorld(), Start, End, 2.5f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
@@ -277,7 +277,7 @@ void ANavAwareEnhancedBase::MarkCorner(TArray<FNavPoint>& InOutArray)
 			DetectCorner(InOutArray, CurEdge, *NextEdge, *PrevEdge, curDeg, lastDeg, i);
 		}
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Finished corner marking!"))
+	UE_LOG(NavAware, Warning, TEXT("Finished corner marking!"))
 }
 
 void ANavAwareEnhancedBase::DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& NextEdge, FNavPoint& LastEdge, float& curDeg, float& lastDeg, uint8 i) const
@@ -332,6 +332,11 @@ void ANavAwareEnhancedBase::FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray)
 
 void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 {
+#define BOTH ECornerCheck::BothAreCorner
+#define ONLYNEXT ECornerCheck::NextIsCorner
+#define ONLYPREV ECornerCheck::PrevIsCorner
+#define NONE ECornerCheck::None
+	
 	FScopeLock Lock(&MarkingEntrySection);
 
 	//if num is 0 or 1, theres no need to mark
@@ -346,16 +351,30 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 		
 		if (CurEdge.Type < EWallType::Corner)
 		{
-			if (CurEdge.PrevEdge && CurEdge.PrevEdge->Type == EWallType::Corner)
+			switch (CheckNeighborCorner(CurEdge))
 			{
+			case ONLYNEXT:
+			case ONLYPREV:
 				CurEdge.Type = EWallType::Entry;
-			}
-			else if (CurEdge.NextEdge && CurEdge.NextEdge->Type == EWallType::Corner)
-			{
-				CurEdge.Type = EWallType::Entry;
+				break;
+				
+			case BOTH:
+				if (GetEdgeNeighborDist(CurEdge) <= CornerBlur)
+				{
+					CurEdge.Type = EWallType::Corner;
+				}
+				else
+				{
+					CurEdge.Type = EWallType::Entry;
+				}
+				break;
+				
+			case NONE:
+				default:
+				break;
 			}
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Finished marking entries of the corner!"))
+	UE_LOG(NavAware, Warning, TEXT("Finished marking entries of the corner!"))
 }

@@ -15,11 +15,21 @@ class ARecastNavMesh;
 UENUM(BlueprintType)
 enum class EWallType : uint8
 {
-	Wall,
-	FakeCorner,
-	Corner,
-	Entry,
+    Wall,
+    FakeCorner,
+    Corner,
+    Entry,
 };
+
+UENUM(BlueprintType)
+enum class ECornerCheck : uint8
+{
+    None,
+    PrevIsCorner,
+    NextIsCorner,
+    BothAreCorner,
+};
+
 
 USTRUCT(BlueprintType)
 struct FNavPoint
@@ -47,9 +57,9 @@ struct FNavPoint
 	FNavPoint* PrevEdge;
 	FNavPoint* NextEdge;
 
-	FORCEINLINE FNavPoint(FVector inStart = FVector::ZeroVector, FVector inEnd = FVector::ZeroVector,
-		uint8 inEdgeID = 0, uint8 inLineID = 0, EWallType inType = EWallType::Wall, float inDegree = 0.f, FNavPoint* inPrevEdge = nullptr, FNavPoint* inNextEdge = nullptr)
-		: Start(inStart), End(inEnd), EdgeID(inEdgeID), LineID(inLineID), Type(inType), Degree(inDegree), PrevEdge(inPrevEdge), NextEdge(inNextEdge)
+	FORCEINLINE FNavPoint(const FVector& InStart = FVector::ZeroVector, const FVector& InEnd = FVector::ZeroVector,
+		uint8 InEdgeID = 0, uint8 InLineID = 0, EWallType InType = EWallType::Wall, float InDegree = 0.f, FNavPoint* InPrevEdge = nullptr, FNavPoint* InNextEdge = nullptr)
+		: Start(InStart), End(InEnd), EdgeID(InEdgeID), LineID(InLineID), Type(InType), Degree(InDegree), PrevEdge(InPrevEdge), NextEdge(InNextEdge)
 	{
 	}
 };
@@ -101,6 +111,10 @@ protected:
 	/*Min compensation: added up of two degrees that smaller than this will be marked as fake*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
 	float minCompens = 45.f;
+
+	/**/
+	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
+	float CornerBlur = 100.f;
 
 	/*
 	 * Find walls & corners around
@@ -160,15 +174,17 @@ private:
 	/*Only can be used on edge!
 	 * Need to check if return vector if is zero vector!
 	 */
-	FORCEINLINE FVector GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly = nullptr)
+	FORCEINLINE FVector GetEdgePolyCenter(const FNavPoint& Edge, NavNodeRef* OutPoly = nullptr) const
 	{
 		FVector OutVector;
 		if (MainRecastNavMesh)
 		{
-			NavNodeRef Poly = MainRecastNavMesh->FindNearestPoly((Edge.Start + Edge.End)/2, FVector(50.f, 50.f, 50.f));
+			const NavNodeRef Poly = MainRecastNavMesh->FindNearestPoly((Edge.Start + Edge.End)/2, FVector(50.f, 50.f, 50.f));
 			if (OutPoly) *OutPoly = Poly;
 		
 			MainRecastNavMesh->GetPolyCenter(Poly, OutVector);
+
+			DrawDebugDirectionalArrow(GetWorld(), (Edge.Start + Edge.End)/2, OutVector, 5.f, FColor::Yellow, false, 1.f);
 		}
 	
 		return OutVector;
@@ -179,4 +195,50 @@ private:
 	 */
 	void MarkEntry(TArray<FNavPoint>& InOutArray);
 	FCriticalSection MarkingEntrySection;
+
+	static FORCEINLINE ECornerCheck CheckNeighborCorner(const FNavPoint& Edge)
+	{
+		const bool prevIsCorner = Edge.PrevEdge && Edge.PrevEdge->Type == EWallType::Corner;
+		const bool nextIsCorner = Edge.NextEdge && Edge.NextEdge->Type == EWallType::Corner;
+		
+		if (prevIsCorner && nextIsCorner)
+		{
+			return ECornerCheck::BothAreCorner;
+		}
+		if (!prevIsCorner && !nextIsCorner)
+		{
+			return ECornerCheck::None;
+		}
+		if (prevIsCorner)
+		{
+			return ECornerCheck::PrevIsCorner;
+		}
+		if (nextIsCorner)
+		{
+			return ECornerCheck::NextIsCorner;
+		}
+		
+		return ECornerCheck::None;
+	}
+
+	FORCEINLINE float GetEdgeNeighborDist(const FNavPoint& Edge)
+	{
+		float OutDistance = 0.f;
+		
+		const FVector CurEdgeMiddlePoint = (Edge.Start + Edge.End)/2;
+		
+		if (Edge.NextEdge)
+		{
+			const FVector NextEdgeMiddlePoint = (Edge.NextEdge->Start + Edge.NextEdge->End)/2;
+			OutDistance += (CurEdgeMiddlePoint - NextEdgeMiddlePoint).Length();
+		}
+		
+		if (Edge.PrevEdge)
+		{
+			const FVector PrevEdgeMiddlePoint = (Edge.PrevEdge->Start + Edge.PrevEdge->End)/2;
+			OutDistance += (CurEdgeMiddlePoint - PrevEdgeMiddlePoint).Length();
+		}
+		
+		return OutDistance;
+	}
 };
