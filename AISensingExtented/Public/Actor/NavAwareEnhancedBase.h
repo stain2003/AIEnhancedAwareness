@@ -128,7 +128,7 @@ private:
 	/*
 	 * Takes in an TArray<FNavigationWallEdge>, sorts element in the order of head & tail, into separate lines.
 	 */
-	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& OutArray, bool bDebug = false);
+	void GatherEdgesWithSorting(TArray<FNavigationWallEdge>& InArray, TArray<FNavPoint>& TempArray, bool bDebug = false);
 	FCriticalSection GatherSortingEdgesSection;
 
 	/*

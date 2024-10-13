@@ -86,6 +86,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	FScopeLock Lock(&GatherSortingEdgesSection);
 	
 	//OutArray.Empty();
+	TArray<FNavPoint> TempArray;
 	
 	if(InArray.Num() == 0)
 	{
@@ -118,16 +119,16 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 	{
 		CurrentIndex++;
 		CurrentLineID = 1;	
-		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
+		TempArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
 	}
 	else
 	{
 		CurrentLineID = 0;
-		OutArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
+		TempArray.Add(FNavPoint(InArray[0].Start, InArray[0].End, CurrentIndex, CurrentLineID));
 	}
 	EdgesMap.Remove(InArray[0].Start);
 	
-	FNavPoint LineHeader = OutArray[0];	//LineHeader: supposed to be the head of the current line
+	FNavPoint LineHeader = TempArray[0];	//LineHeader: supposed to be the head of the current line
 	FNavPoint Connector = LineHeader;	//Connector: supposed to be the tail of the current line
 	
 	/*The main part of the algorithm, loop through every element until map is empty, which means the transfer is completed
@@ -140,18 +141,18 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		//Edge found that connected by connector if there is one(tail)
 		if (const FVector* Value = EdgesMap.Find(Connector.End))
 		{
-			OutArray.Push(FNavPoint(Connector.End, *Value, CurrentIndex, CurrentLineID));
+			TempArray.Push(FNavPoint(Connector.End, *Value, CurrentIndex, CurrentLineID));
 			EdgesMap.Remove(Connector.End);
-			Connector = OutArray.Last();
+			Connector = TempArray.Last();
 			
 			continue;
 		}
 		//Edge found that connected by header if there is one(head)
 		if (const FVector* Key = EdgesMap.FindKey(LineHeader.Start))
 		{
-			OutArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentIndex, CurrentLineID), CurrentLineEntry);
+			TempArray.Insert(FNavPoint(*Key, LineHeader.Start, CurrentIndex, CurrentLineID), CurrentLineEntry);
 			EdgesMap.Remove(*Key);
-			LineHeader = OutArray[CurrentLineEntry];
+			LineHeader = TempArray[CurrentLineEntry];
 			
 			continue;
 		}
@@ -164,36 +165,38 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 		if (const FVector* TailValue = EdgesMap.Find(it.Value()))
 		{
 			CurrentLineID += 1;
-			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
-			LineHeader = OutArray.Last();
+			TempArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
+			LineHeader = TempArray.Last();
 			
 			CurrentIndex++;
-			OutArray.Push(FNavPoint(it.Value(), *TailValue, CurrentIndex, CurrentLineID));
-			Connector = OutArray.Last();
-			CurrentLineEntry = OutArray.Num() - 2;
+			TempArray.Push(FNavPoint(it.Value(), *TailValue, CurrentIndex, CurrentLineID));
+			Connector = TempArray.Last();
+			CurrentLineEntry = TempArray.Num() - 2;
 			EdgesMap.Remove(it.Value());
 		}
 			//if it has head, add its head first
 		else if (const FVector* HeadKey = EdgesMap.FindKey(it.Key()))
 		{
 			CurrentLineID += 1;
-			OutArray.Push(FNavPoint(*HeadKey, it.Key(), CurrentIndex, CurrentLineID));
-			LineHeader = OutArray.Last();
+			TempArray.Push(FNavPoint(*HeadKey, it.Key(), CurrentIndex, CurrentLineID));
+			LineHeader = TempArray.Last();
 			EdgesMap.Remove(*HeadKey);
 			
 			CurrentIndex++;
-			OutArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
-			Connector = OutArray.Last();
-			CurrentLineEntry = OutArray.Num() - 2;
+			TempArray.Push(FNavPoint(it.Key(), it.Value(), CurrentIndex, CurrentLineID));
+			Connector = TempArray.Last();
+			CurrentLineEntry = TempArray.Num() - 2;
 		}
 			//if it is single, insert it to the top
 		else
 		{
-			OutArray.Insert(FNavPoint(it.Key(), it.Value(), CurrentIndex, 0), 0);
+			TempArray.Insert(FNavPoint(it.Key(), it.Value(), CurrentIndex, 0), 0);
 			CurrentLineEntry += 1;
 		}
 		EdgesMap.Remove(it.Key());
 	}
+
+	OutArray = TempArray;
 	
 	UE_LOG(NavAware, Warning, TEXT("Finished sorting, InArray count: %d, OutArray count: %d"), InArray.Num(), OutArray.Num())
 }
@@ -381,7 +384,7 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 
 void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
 {
-	for (auto CurEdge& : InOutArray)
+	for (auto& CurEdge : InOutArray)
 	{
 		if (CurEdge.Type == EWallType::Corner || CurEdge.NextEdge && CurEdge.NextEdge->Type >= EWallType::Corner )
 		{
