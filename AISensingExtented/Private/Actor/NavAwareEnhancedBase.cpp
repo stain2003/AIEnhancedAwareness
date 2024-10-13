@@ -39,6 +39,7 @@ void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 		MarkCorner(WallEdges);
 		FilterOnlyInnerEdge(WallEdges);
 		MarkEntry(WallEdges);
+		TakeSteps(WallEdges);
 	}
 	else
 	{
@@ -386,15 +387,23 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
 {
 	for (auto& CurEdge : InOutArray)
 	{
-		if (CurEdge.Type == EWallType::Corner || CurEdge.NextEdge && CurEdge.NextEdge->Type >= EWallType::Corner )
+		const bool ForEntries = CurEdge.Type == EWallType::Entry && CurEdge.PrevEdge && CurEdge.PrevEdge->Type == EWallType::Corner;
+		const bool ForCorner = CurEdge.Type == EWallType::Corner;
+		
+		if (ForEntries || ForCorner)
 		{
 			uint8 Step = 0;
 			FVector Point = CurEdge.Start;
-			while (CheckIfWithinEdge(CurEdge.Start, CurEdge.End, Point))
+			while (true)
 			{
 				Point = TakeStepOnEdge(CurEdge.Start, CurEdge.End, 30.f, Step);
-				DrawDebugBox(GetWorld(), Point, FVector(5.f, 5.f, 5.f), FColor::Magenta, false, 1.f, 0, 2.f);
-				Step++;
+                if(CheckIfWithinEdge(CurEdge.Start, CurEdge.End, Point))
+                {
+                    DrawDebugBox(GetWorld(), Point, FVector(5.f, 5.f, 5.f), FColor::Magenta, false, 1.f, 0, 2.f);
+                    Step++;
+                	continue;
+                }
+				break;
 			}
 		}
 	}
