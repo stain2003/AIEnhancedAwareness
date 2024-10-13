@@ -114,13 +114,13 @@ protected:
 
 	/**/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo|Edge Detection")
-	float CornerBlur = 100.f;
+	float CornerBlur = 500.f;
 
 	/*
 	 * Find walls & corners around
 	 */
 	UFUNCTION(BlueprintCallable)
-	void FindWall(bool bDebug = false, float radius = 550.f);
+	void FindNearestEdges(bool bDebug = false, float radius = 550.f);
 	
 public:
 private:
@@ -147,12 +147,29 @@ private:
 	 * In the meantime check if it is fake
 	 */
 	void DetectCorner(TArray<FNavPoint>& InOutArray, FNavPoint& CurEdge, FNavPoint& NextEdge, FNavPoint& LastEdge, float& curDeg, float& lastDeg, uint8 i) const;
+
+
+	/*
+	 * Filter out the outer edges from a curves, which won't be needed to calculate the cross road entries
+	 */
+	void FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray);
+	FCriticalSection FilterSection;
+	
+	/*
+	 * Mark road entries
+	 */
+	void MarkEntry(TArray<FNavPoint>& InOutArray);
+	FCriticalSection MarkingEntrySection;
+
+	void TakeSteps(const TArray<FNavPoint>& InOutArray);
+	
+public:
 	
 	FORCEINLINE bool CheckCorner(const float& curDeg) const
 	{
 		return curDeg >= minCurDeg || curDeg <= -minCurDeg;
 	};
-
+	
 	/*
 	 * Check if current corner is fake, when last degree != 0.f,
 	 * in another word, this edge is not the first of the current array/line,
@@ -165,12 +182,6 @@ private:
 		return lastDeg != 0.f && Compensation < minCompens;
 	}
 
-	/*
-	 * Filter out the outer edges from a curves, which won't be needed to calculate the cross road entries
-	 */
-	void FilterOnlyInnerEdge(TArray<FNavPoint>& InOutArray);
-	FCriticalSection FilterSection;
-	
 	/*Only can be used on edge!
 	 * Need to check if return vector if is zero vector!
 	 */
@@ -183,19 +194,14 @@ private:
 			if (OutPoly) *OutPoly = Poly;
 		
 			MainRecastNavMesh->GetPolyCenter(Poly, OutVector);
-
-			DrawDebugDirectionalArrow(GetWorld(), (Edge.Start + Edge.End)/2, OutVector, 5.f, FColor::Yellow, false, 1.f);
 		}
 	
 		return OutVector;
 	}
 
 	/*
-	 * Mark road entries
+	 * Return type of neighbor edges
 	 */
-	void MarkEntry(TArray<FNavPoint>& InOutArray);
-	FCriticalSection MarkingEntrySection;
-
 	static FORCEINLINE ECornerCheck CheckNeighborCorner(const FNavPoint& Edge)
 	{
 		const bool prevIsCorner = Edge.PrevEdge && Edge.PrevEdge->Type == EWallType::Corner;
@@ -240,5 +246,34 @@ private:
 		}
 		
 		return OutDistance;
+	}
+
+	FORCEINLINE FVector TakeStepOnEdge(const FVector& Start, const FVector& End, float InStep, uint8 Steps) const
+	{
+		FVector OutFVector = End - Start;
+		const float RatioToStep = InStep / OutFVector.Length();
+		
+		OutFVector = OutFVector * RatioToStep;
+		
+		return Start + OutFVector * Steps;
+	}
+
+	FORCEINLINE bool CheckIfWithinEdge(const FVector& Start, const FVector& End, FVector& Vector)
+	{
+		float maxx,minx,maxy,miny;
+		
+		maxx = Start.X >End.X?	Start.X :End.X ;
+		minx = Start.X >End.X?	End.X :Start.X ;
+		maxy = Start.Y >End.Y?	Start.Y :End.Y ;
+		miny = Start.Y >End.Y?	End.Y :Start.Y ;
+		
+		if( (Vector.X - Start.X )*(End.Y -Start.Y) == (End.X - Start.X) *(Vector.Y - Start.Y)
+			&& ( Vector.X >= minx && Vector.X <= maxx )
+			&& ( Vector.Y >= miny && Vector.Y <= maxy))
+		{
+			return true;
+		}
+
+		return false;
 	}
 };

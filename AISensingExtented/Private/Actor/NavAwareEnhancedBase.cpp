@@ -23,7 +23,7 @@ void ANavAwareEnhancedBase::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
+void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 {
 	MainNavSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (MainNavSystem)
@@ -52,18 +52,18 @@ void ANavAwareEnhancedBase::FindWall(bool bDebug, float radius)
 		for (const auto&  [Start, End, ID, LineID, Type, Degree, Prev, Next] : WallEdges)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
-			DrawDebugDirectionalArrow(GetWorld(), Start, End, 2.5f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
+			DrawDebugDirectionalArrow(GetWorld(), Start, End, 20.f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f);
 			
-			FString PrintString = FString::Printf(TEXT("[%d][%02d]Deg: %.2f"), LineID, ID, Degree);
+			FString PrintString = FString::Printf(TEXT("[%d][%02d]Deg: %.2f, Length: %.2f"), LineID, ID, Degree, (End - Start).Length());
 			DrawDebugString(GetWorld(), End + FVector(0.f,0.f,0.f), PrintString, 0, FColor::White, 1.f, false, 1.f);
 			
 			if (Type == EWallType::Corner)
 			{
-				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Cyan, false, 1.f);
+				DrawDebugSphere(GetWorld(), End, 20.f, 8, FColor::Cyan, false, 1.f);
 			}
 			else if (Type == EWallType::Entry)
 			{
-				DrawDebugSphere(GetWorld(), End, 30.f, 12, FColor::Purple, false, 1.f);
+				DrawDebugSphere(GetWorld(), End, 20.f, 8, FColor::Purple, false, 1.f);
 			}
 			if (bShowLog)
 			{
@@ -85,7 +85,7 @@ void ANavAwareEnhancedBase::GatherEdgesWithSorting(TArray<FNavigationWallEdge>& 
 {
 	FScopeLock Lock(&GatherSortingEdgesSection);
 	
-	OutArray.Empty();
+	//OutArray.Empty();
 	
 	if(InArray.Num() == 0)
 	{
@@ -377,4 +377,22 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 	}
 
 	UE_LOG(NavAware, Warning, TEXT("Finished marking entries of the corner!"))
+}
+
+void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
+{
+	for (auto CurEdge& : InOutArray)
+	{
+		if (CurEdge.Type == EWallType::Corner || CurEdge.NextEdge && CurEdge.NextEdge->Type >= EWallType::Corner )
+		{
+			uint8 Step = 0;
+			FVector Point = CurEdge.Start;
+			while (CheckIfWithinEdge(CurEdge.Start, CurEdge.End, Point))
+			{
+				Point = TakeStepOnEdge(CurEdge.Start, CurEdge.End, 30.f, Step);
+				DrawDebugBox(GetWorld(), Point, FVector(5.f, 5.f, 5.f), FColor::Magenta, false, 1.f, 0, 2.f);
+				Step++;
+			}
+		}
+	}
 }
