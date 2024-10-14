@@ -392,6 +392,47 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
 		
 		if (ForEntries || ForCorner)
 		{
+			/*
+			 *Make a new array arranged by distance between CurEdge and other Edges from different lines*/
+			TArray<FNavPoint> ArrayByDist = InOutArray;
+			//Delete elements in CurEdge's line including itself, preventing calculating their distance
+			bool EnteredSameLine = false;
+			for (uint8 Index = 0; Index < ArrayByDist.Num(); Index++)
+			{
+				if (ArrayByDist[Index].LineID == CurEdge.LineID)
+				{
+					EnteredSameLine = true;
+					ArrayByDist.RemoveAt(Index);
+					Index--;
+				}
+				else
+				{
+					if (EnteredSameLine) break;
+				}
+			}
+			//Sorting the Array by distance
+			FVector MiddlePointOnCurEdge = (CurEdge.Start+CurEdge.End)/2;
+			ArrayByDist.Sort([&MiddlePointOnCurEdge](const FNavPoint& EdgeA, const FNavPoint& EdgeB)
+			{
+				return FVector::Dist(MiddlePointOnCurEdge, (EdgeA.Start + EdgeA.End)/2) < FVector::Dist(MiddlePointOnCurEdge, (EdgeB.Start + EdgeB.End)/2);
+			});
+
+			//Debug
+			for (auto& TargetEdge : ArrayByDist)
+			{
+				const FVector TargetLoc = (TargetEdge.Start + TargetEdge.End)/2;
+				const float Dist = FVector::Dist(MiddlePointOnCurEdge, TargetLoc);
+				UE_LOG(LogTemp, Warning, TEXT("[%02d]Closest Edges: [%02d]; LineID: [%d]; Distance: [%.1f]; Loc: [%.1f, %.1f, %.1f]"),
+					CurEdge.EdgeID, TargetEdge.EdgeID, TargetEdge.LineID, Dist, TargetLoc.X, TargetLoc.Y, TargetLoc.Z);
+
+				if (CurEdge.EdgeID == 1)
+				{
+					DrawDebugDirectionalArrow(GetWorld(), MiddlePointOnCurEdge, TargetLoc, 5.f, FColor::Emerald, false, 1.f);
+					FString PrintString = FString::Printf(TEXT("Dist: %.1f"), Dist);
+					DrawDebugString(GetWorld(), (MiddlePointOnCurEdge + TargetLoc)/2, PrintString, 0, FColor::White, 1.f, false, 1.5f);
+				}
+			}
+			
 			uint8 Step = 0;
 			FVector Point = CurEdge.Start;
 			while (true)
@@ -399,6 +440,7 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
 				Point = TakeStepOnEdge(CurEdge.Start, CurEdge.End, 30.f, Step);
                 if(CheckIfWithinEdge(CurEdge.Start, CurEdge.End, Point))
                 {
+                	//Code here
                     DrawDebugBox(GetWorld(), Point, FVector(5.f, 5.f, 5.f), FColor::Magenta, false, 1.f, 0, 2.f);
                     Step++;
                 	continue;
