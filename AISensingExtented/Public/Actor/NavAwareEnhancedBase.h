@@ -64,6 +64,23 @@ struct FNavPoint
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FCorner
+{
+	GENERATED_BODY()
+	
+	FNavPoint* CornerStart = nullptr;
+	
+	FNavPoint* CornerEnd = nullptr;
+
+	uint8 CornerID = 0;
+	
+	FORCEINLINE FCorner(FNavPoint* InStart = nullptr, FNavPoint* InEnd = nullptr, uint8 InID = 0)
+		:CornerStart(InStart), CornerEnd(InEnd), CornerID(InID)
+	{
+	}
+};
+
 UCLASS()
 class AISENSINGEXTENTED_API ANavAwareEnhancedBase : public AActor
 {
@@ -89,6 +106,10 @@ protected:
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FNavPoint> WallEdges;
+
+	/*Array that used to be store nearby edges*/
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
+	TArray<FCorner> Corners;
 	
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
@@ -161,7 +182,19 @@ private:
 	void MarkEntry(TArray<FNavPoint>& InOutArray);
 	FCriticalSection MarkingEntrySection;
 
+	/*
+	 * Make corners into an array
+	 */
+	void MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners) const;
+	FCriticalSection MakeCornerArraySection;
+	
+	/*
+	 * Looping through the array, find corner and out entries and do follow things:
+	 * For every said above edges, we make a new array that stores none family edges, in the order of distance
+	 */
 	void TakeSteps(const TArray<FNavPoint>& InOutArray);
+
+	void RangeNoneFamilyEdgesByDistance(const FNavPoint& CurEdge, TArray<FNavPoint>& ArrayByDist);
 	
 public:
 	
