@@ -185,7 +185,7 @@ private:
 	/*
 	 * Make corners into an array
 	 */
-	void MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners) const;
+	void MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners);
 	FCriticalSection MakeCornerArraySection;
 	
 	/*

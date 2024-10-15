@@ -88,12 +88,11 @@ void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 			}
 			
 			FNavPoint* DrawingEdge = Start;
-			DrawDebugDirectionalArrow(GetWorld(), DrawingEdge->Start, DrawingEdge->End, 5.f, FColor::Purple, false, 1.3, 0, 5.f);
 			while (true)
 			{
-				DrawingEdge = DrawingEdge->NextEdge;
-				DrawDebugDirectionalArrow(GetWorld(), DrawingEdge->Start, DrawingEdge->End, 5.f, FColor::Purple, false, 1.3, 0, 5.f);
+				DrawDebugDirectionalArrow(GetWorld(), DrawingEdge->Start, DrawingEdge->End, 10.f, FColor::Purple, false, 1.3, 0, 5.f);
 				if (DrawingEdge == End) break;
+				DrawingEdge = DrawingEdge->NextEdge;
 			}
 			
 			DrawDebugBox(GetWorld(), Start->Start, FVector(5.f, 5.f, 50.f), FColor::Green, false, 1.f);
@@ -403,8 +402,10 @@ void ANavAwareEnhancedBase::MarkEntry(TArray<FNavPoint>& InOutArray)
 	UE_LOG(NavAware, Warning, TEXT("Finished marking entries of the corner!"))
 }
 
-void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners) const
+void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners)
 {
+	FScopeLock Lock(&MakeCornerArraySection);
+	
 	uint8 Num = InArray.Num();
 	if (Num == 0) return;
 
@@ -414,6 +415,82 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 	{
 		FNavPoint& CurEdge = InArray[i];
 		UE_LOG(NavAware, Warning, TEXT("Checking [%02d] if is a corner start"), CurEdge.EdgeID)
+
+		/*Additional step, check current line if is a loop that only contains corners
+		 * if so, use the length of each edge to determine corners from the line
+		 * usually this only happen when a wall is small and straight enough to be wrapped around by edges
+		 */
+		bool isLineStart = i == 0 || i != 0 && CurEdge.LineID != InArray[i - 1].LineID;
+		bool hasPrevEdge = CurEdge.PrevEdge != nullptr;
+		if (isLineStart && hasPrevEdge)
+		{
+			UE_LOG(NavAware, Warning, TEXT("[%02d] of [%d]this line is a loop"), CurEdge.EdgeID, CurEdge.LineID)
+			uint8 EdgeCount = 0;;
+			bool hasOnlyCorner = false;
+			
+			if (CurEdge.Type == EWallType::Corner)
+			{
+				UE_LOG(NavAware, Warning, TEXT("[%02d] of [%d]start looking for suitable corners for this line"), CurEdge.EdgeID, CurEdge.LineID)
+				FNavPoint* NextEdge = CurEdge.NextEdge;
+				while (true)
+				{
+					if (NextEdge == &CurEdge)
+					{	
+						UE_LOG(NavAware, Warning, TEXT("this line [%d] is a loop that only contains Corner!"), NextEdge->LineID)
+						hasOnlyCorner = true;
+						break;
+					}
+					
+					UE_LOG(NavAware, Warning, TEXT("checking if [%02d] of [%d] is corner"), NextEdge->EdgeID, NextEdge->LineID)
+					if (NextEdge->Type != EWallType::Corner)
+					{
+						UE_LOG(NavAware, Warning, TEXT("[%02d] of [%d] is not a corner! this line doesnt need to do samll wall test"), NextEdge->EdgeID, NextEdge->LineID)
+						break;
+					}
+					NextEdge = NextEdge->NextEdge;
+					EdgeCount++;
+				}
+			}
+			
+			if (hasOnlyCorner)
+            {
+				UE_LOG(NavAware, Warning, TEXT("Starting grouping corners by distance for line: [%d]..."), CurEdge.LineID)
+            	for (uint8 it = i; it < i + EdgeCount; it++)
+            	{
+            		FNavPoint& ItEdge = InArray[it];
+					//往回寻，找到第一个长度小于 300.f的作为起点：
+            		uint8 timesWentBack = 0;
+            		FNavPoint* StartPoint = &ItEdge;
+					while ((StartPoint->PrevEdge->End - StartPoint->PrevEdge->Start).Length() < 300.f && timesWentBack < EdgeCount)
+					{
+						StartPoint = StartPoint->PrevEdge;
+						timesWentBack++;
+					}
+            		
+					UE_LOG(NavAware, Warning, TEXT("checking [%02d] if short enough to be grounped into a new corner..."), ItEdge.EdgeID)
+            		if ((ItEdge.End - ItEdge.Start).Length() < 300.f)
+            		{
+            			UE_LOG(NavAware, Warning, TEXT("[%02d] is short enough! Checking for more..."), ItEdge.EdgeID)
+            			FNavPoint* NextEdge = &ItEdge;
+            			
+            			while ((NextEdge->NextEdge->End - NextEdge->NextEdge->Start).Length() < 300.f && it < EdgeCount)
+            			{
+            				NextEdge = NextEdge->NextEdge;
+            				UE_LOG(NavAware, Warning, TEXT("[%02d] is the current corner end..."), NextEdge->EdgeID)
+            				it++;
+            			}
+            			UE_LOG(NavAware, Warning, TEXT("Found a new corners group, start: [%02d], end: [%02d]..."), ItEdge.EdgeID, NextEdge->EdgeID)
+            			OutCorners.Push(FCorner(&ItEdge, NextEdge, NextEdge->EdgeID));
+            		}
+            	}
+				
+            	//skip this line, for the future loop
+				UE_LOG(NavAware, Warning, TEXT("Finished small wall corner grouping for line: [%d]"), CurEdge.LineID)
+            	i += EdgeCount;
+            	continue;
+            }
+		}
+
 		
 		const bool CornerStart1 = CurEdge.Type == EWallType::Corner && CurEdge.PrevEdge && CurEdge.PrevEdge->Type == EWallType::Entry;
 		const bool CornerStart2 = CurEdge.Type == EWallType::Corner && CurEdge.PrevEdge == nullptr;
@@ -423,7 +500,7 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 			FNavPoint* CornerStart = &CurEdge;
 			FNavPoint* CornerEnd = nullptr;
 			FNavPoint* NextEdge = &CurEdge;
-			//Situation 1: keep iterate until find the next entry, or the next edge is not exist
+			//Situation 1: keep iterate until find the next entry, or hit the end of the line
 			while (NextEdge->NextEdge != nullptr)
 			{
 				if (i < Num - 1 && InArray[i].LineID == InArray[i + 1].LineID)
