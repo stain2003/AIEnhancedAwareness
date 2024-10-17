@@ -179,7 +179,7 @@ private:
 	/*
 	 * Mark road entries
 	 */
-	void MarkEntry(TArray<FNavPoint>& InOutArray);
+	void MarkEntryEdges(TArray<FNavPoint>& InOutArray);
 	FCriticalSection MarkingEntrySection;
 
 	/*
@@ -194,8 +194,13 @@ private:
 	 */
 	void TakeSteps(const TArray<FNavPoint>& InOutArray);
 
-	void RangeNoneFamilyEdgesByDistance(const FNavPoint& CurEdge, TArray<FNavPoint>& ArrayByDist);
-	
+	/*
+	 * 1.Delete edges in the same line as input edge
+	 * 2.Arrange edges in the order of distance to input edge
+	 */
+	void GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, TArray<FNavPoint>& ArrayByDist, bool bOnlyOneForEachLine = true);
+
+	void MakeEntries(TArray<FNavPoint>& InArray, TArray<FCorner>& InCorners);
 public:
 	
 	FORCEINLINE bool CheckCorner(const float& curDeg) const
