@@ -81,6 +81,30 @@ struct FCorner
 	}
 };
 
+USTRUCT(BlueprintType)
+struct FEntry
+{
+	GENERATED_BODY()
+	
+	uint8* CornerID = 0;
+	
+	uint8* TargetLineID = 0;
+
+	FNavPoint*	EdgeA = nullptr;
+
+	FNavPoint* EdgeB = nullptr;
+	
+	FVector Start = FVector::ZeroVector;
+
+	FVector End = FVector::ZeroVector;
+
+	float Width = 0.f;
+	// FORCEINLINE FEntry(FNavPoint* InStart = nullptr, FNavPoint* InEnd = nullptr, uint8 InID = 0)
+	// 	:CornerStart(InStart), CornerEnd(InEnd), CornerID(InID)
+	// {
+	// }
+};
+
 UCLASS()
 class AISENSINGEXTENTED_API ANavAwareEnhancedBase : public AActor
 {
@@ -183,7 +207,7 @@ private:
 	FCriticalSection MarkingEntrySection;
 
 	/*
-	 * Make corners into an array
+	 * Make connected corners into a corner groups, into an array
 	 */
 	void MakeCornerArray(TArray<FNavPoint>& InArray, TArray<FCorner>& OutCorners);
 	FCriticalSection MakeCornerArraySection;
@@ -192,13 +216,13 @@ private:
 	 * Looping through the array, find corner and out entries and do follow things:
 	 * For every said above edges, we make a new array that stores none family edges, in the order of distance
 	 */
-	void TakeSteps(const TArray<FNavPoint>& InOutArray);
+	void TakeSteps(const TArray<FNavPoint>& InOutArray, bool bDebug = false);
 
 	/*
-	 * 1.Delete edges in the same line as input edge
-	 * 2.Arrange edges in the order of distance to input edge
+	 *Filter the nearest edges to given edge, from given array
+	 *Optional: get only one edge of each line
 	 */
-	void GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, TArray<FNavPoint>& ArrayByDist, bool bOnlyOneForEachLine = true);
+	void GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine = true);
 
 	void MakeEntries(TArray<FNavPoint>& InArray, TArray<FCorner>& InCorners);
 public:
@@ -286,14 +310,14 @@ public:
 		return OutDistance;
 	}
 
-	FORCEINLINE FVector TakeStepOnEdge(const FVector& Start, const FVector& End, float InStep, uint8 Steps) const
+	FORCEINLINE FVector TakeStepOnEdge(const FVector& Start, const FVector& End, float AmountPerStep, uint8 CurStep) const
 	{
 		FVector OutFVector = End - Start;
-		const float RatioToStep = InStep / OutFVector.Length();
+		const float RatioToStep = AmountPerStep / OutFVector.Length();
 		
 		OutFVector = OutFVector * RatioToStep;
 		
-		return Start + OutFVector * Steps;
+		return Start + OutFVector * CurStep;
 	}
 
 	FORCEINLINE bool CheckIfWithinEdge(const FVector& Start, const FVector& End, FVector& Vector)

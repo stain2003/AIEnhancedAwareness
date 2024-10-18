@@ -40,7 +40,7 @@ void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 		FilterOnlyInnerEdge(WallEdges);
 		MarkEntryEdges(WallEdges);
 		MakeCornerArray(WallEdges, Corners);
-		TakeSteps(WallEdges);
+		TakeSteps(WallEdges, true);
 	}
 	else
 	{
@@ -54,7 +54,7 @@ void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 		for (const auto&  [Start, End, ID, LineID, Type, Degree, Prev, Next] : WallEdges)
 		{
 			DrawDebugBox(GetWorld(), End, FVector(10.f, 10.f, 20.f), FColor::Red, false, 1.1f);
-			//DrawDebugDirectionalArrow(GetWorld(), Start, End, 20.f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f, 0);
+			DrawDebugDirectionalArrow(GetWorld(), Start, End, 20.f, FColor::MakeRedToGreenColorFromScalar(LineID * 0.15f), false, 1.f, 0);
 			
 			FString PrintString = FString::Printf(TEXT("[%d][%02d]Deg: %.2f, Length: %.2f"), LineID, ID, Degree, (End - Start).Length());
 			DrawDebugString(GetWorld(), End + FVector(0.f,0.f,0.f), PrintString, 0, FColor::White, 1.f, false, 1.f);
@@ -491,32 +491,13 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 			            if (EndEdge != nullptr)
 			            {
 			            	//UE_LOG(NavAware, Warning, TEXT("found a corner: start[%02d], end[%02d]..."), StartEdge->EdgeID, EndEdge->EdgeID)
-				            Corners.Push(FCorner(StartEdge, EndEdge, EndEdge->EdgeID));
+				            OutCorners.Push(FCorner(StartEdge, EndEdge, EndEdge->EdgeID));
 			            	EndEdge = nullptr;
 			            	StartEdge = nullptr;
 			            }
 		            }
 	            	LoopEdge = LoopEdge->NextEdge;
 	            }
-				
-     //        	for (uint8 it = i; it < i + EdgeIteratedAlready; it++)
-     //        	{
-					// UE_LOG(NavAware, Warning, TEXT("checking [%02d] if short enough to be grounped into a new corner..."), ItEdge.EdgeID)
-     //        		if ((ItEdge.End - ItEdge.Start).Length() < 300.f)
-     //        		{
-     //        			UE_LOG(NavAware, Warning, TEXT("[%02d] is short enough! Checking for more..."), ItEdge.EdgeID)
-     //        			FNavPoint* NextEdge = &ItEdge;
-     //        			
-     //        			while ((NextEdge->NextEdge->End - NextEdge->NextEdge->Start).Length() < 300.f && it < EdgeIteratedAlready)
-     //        			{
-     //        				NextEdge = NextEdge->NextEdge;
-     //        				UE_LOG(NavAware, Warning, TEXT("[%02d] is the current corner end..."), NextEdge->EdgeID)
-     //        				it++;
-     //        			}
-     //        			UE_LOG(NavAware, Warning, TEXT("Found a new corners group, start: [%02d], end: [%02d]..."), ItEdge.EdgeID, NextEdge->EdgeID)
-     //        			OutCorners.Push(FCorner(&ItEdge, NextEdge, NextEdge->EdgeID));
-     //        		}
-     //        	}
 				
             	//skip this line, for the future loop
 				//UE_LOG(NavAware, Warning, TEXT("Finished small wall corner grouping for line: [%d]"), CurEdge.LineID)
@@ -564,79 +545,114 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 					CornerEnd = NextEdge;
 				}
 			}
-			OutCorners.Push(FCorner(CornerStart, CornerEnd, i));
+			OutCorners.Push(FCorner(CornerStart, CornerEnd, CornerEnd->EdgeID));
 		}
 	}
 }
 
-void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray)
+void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool bDebug)
 {
-	for (auto& CurEdge : InOutArray)
+	if (InOutArray.Num() < 2)	return;
+	
+	UE_LOG(NavAware, Warning, TEXT("Starting to steps for each corner and find entries from them"))
+	/*For every corner*/
+	for (auto& CurCorner : Corners)
 	{
-		const bool ForEntries = CurEdge.Type == EWallType::Entry && CurEdge.PrevEdge && CurEdge.PrevEdge->Type == EWallType::Corner;
-		const bool ForCorner = CurEdge.Type == EWallType::Corner;
-
-		/*
-		 * For each out entry and corner:
-		 */
-		if (ForEntries || ForCorner)
+		UE_LOG(NavAware, Warning, TEXT("Current Corner: [%02d]"), CurCorner.CornerID)
+		/*CurEntries: stores entries derived from current corner to other lines*/
+		TMap<uint8, FEntry> FoundEntries;
+		/*For every edge on this corner*/
+		FNavPoint* LoopingEdge = nullptr;
+		while (LoopingEdge != CurCorner.CornerEnd)
 		{
-			//Make a new array arranged by distance between CurEdge and other Edges from different lines*/
-			TArray<FNavPoint> ArrayByDist = InOutArray;
-			GetNearestEdgesFromGivenArray(CurEdge, ArrayByDist);
-
-
-			
-			/*uint8 Step = 0;
-			FVector StepPoint = CurEdge.Start;
-			while (true)
+			//Init current edge
+			if (LoopingEdge != nullptr)
 			{
-				StepPoint = TakeStepOnEdge(CurEdge.Start, CurEdge.End, 30.f, Step);
-                if(CheckIfWithinEdge(CurEdge.Start, CurEdge.End, StepPoint))
-                {
-                    DrawDebugBox(GetWorld(), StepPoint, FVector(5.f, 5.f, 5.f), FColor::Magenta, false, 1.f, 0, 2.f);
-                    Step++;
-                	/*
-                	 *there should be a delegate, for every step on current edge#1#
-					
-                	
-                	continue;
-                }
-				break;
-			}*/
-			
-			FVector MiddlePointOnCurEdge = (CurEdge.Start+CurEdge.End)/2;
-			//Debug
-			for (auto& TargetEdge : ArrayByDist)
+				LoopingEdge = LoopingEdge->NextEdge;
+			}
+			else
 			{
-				const FVector TargetLoc = (TargetEdge.Start + TargetEdge.End)/2;
-				const float Dist = FVector::Dist(MiddlePointOnCurEdge, TargetLoc);
-				UE_LOG(LogTemp, Warning, TEXT("[%02d]: Closest Edges: [%02d], LineID: [%d], Distance: [%.1f], Loc: [%.1f, %.1f, %.1f];"),
-					CurEdge.EdgeID, TargetEdge.EdgeID, TargetEdge.LineID, Dist, TargetLoc.X, TargetLoc.Y, TargetLoc.Z);
+				LoopingEdge = CurCorner.CornerStart;
+			}
+			UE_LOG(NavAware, Warning, TEXT("Current Edge on this corner: [%02d]"), LoopingEdge->EdgeID)
+			
+			FVector EdgeStart = LoopingEdge->Start;
+			FVector EdgeEnd = LoopingEdge->End;
 
-				if (CurEdge.EdgeID == 1)
+			//Get nearest edges to this edge from other lines
+			TArray<FNavPoint> NearestEdges;
+			GetNearestEdgesFromGivenArray(*LoopingEdge, InOutArray, NearestEdges);
+			
+			/*For every step on this edge*/
+			FVector StepOnEdge = EdgeStart;
+			uint8 Step = 0;
+			while (CheckIfWithinEdge(EdgeStart, EdgeEnd, StepOnEdge))
+			{
+				UE_LOG(NavAware, Warning, TEXT("AAAAAAA"))
+				StepOnEdge = TakeStepOnEdge(EdgeStart, EdgeEnd, 30.f, Step);
+				Step++;
+				/*For every target edge*/
+				for (auto& CurTargetEdge : NearestEdges)
 				{
-					DrawDebugDirectionalArrow(GetWorld(), MiddlePointOnCurEdge, TargetLoc, 5.f, FColor::Emerald, false, 1.f);
-					FString PrintString = FString::Printf(TEXT("Dist: %.1f"), Dist);
-					DrawDebugString(GetWorld(), (MiddlePointOnCurEdge + TargetLoc)/2, PrintString, 0, FColor::White, 1.f, false, 1.5f);
+					UE_LOG(NavAware, Warning, TEXT("[%02d]Current TargetEdge: [%02d]"), LoopingEdge->EdgeID, CurTargetEdge.EdgeID)
+					FVector TargetStart = CurTargetEdge.Start;
+					FVector TargetEnd = CurTargetEdge.End;
+					FVector StepOnTargetEdge = EdgeStart;
+					uint8 TargetStep = 0;
+					while (true)
+					{
+						StepOnTargetEdge = TakeStepOnEdge(TargetStart, TargetEnd, 30.f, TargetStep);
+						if (!CheckIfWithinEdge(TargetStart, TargetEnd, StepOnTargetEdge)) break;
+						TargetStep++;
+						
+						const float NewWidth = (StepOnEdge - StepOnTargetEdge).Length();
+						/*calculate distance between two steps and search in FoundEntries map:
+							use TargetLine id as key to search stored entries and distance,
+							if there is no or current distance is shorter, add or replace existed one with this*/
+						if (FoundEntries.Find(CurTargetEdge.LineID) != nullptr)
+						{
+							if (NewWidth < FoundEntries[CurTargetEdge.LineID].Width)
+							{
+								*FoundEntries.Find(CurTargetEdge.LineID) =
+									FEntry(&CurCorner.CornerID, &CurTargetEdge.LineID, LoopingEdge, &CurTargetEdge, StepOnEdge, StepOnTargetEdge, NewWidth);
+							}
+						}
+						else
+						{
+							FoundEntries.Emplace(CurTargetEdge.LineID, FEntry(&CurCorner.CornerID, &CurTargetEdge.LineID, LoopingEdge, &CurTargetEdge, StepOnEdge, StepOnTargetEdge, NewWidth));
+						}
+					}
 				}
 			}
 		}
+		
+		for (auto& Elem : FoundEntries)
+		{
+			FEntry& Value = Elem.Value;
+			UE_LOG(NavAware, Warning, TEXT("Entries: Corner: [%02d], TargetLine: [%d], EdgeA: [%02d], EdgeB: [%02d], Width: [%.1f]"),
+				*Value.CornerID, Elem.Key, Value.EdgeA->EdgeID, Value.EdgeB->EdgeID, Value.Width)
+			if (*Value.CornerID == 13)
+			{
+				DrawDebugDirectionalArrow(GetWorld(), Value.Start, Value.End, 5.f, FColor::Green, false, 1.f, 0, 2.f);
+			}
+		}
 	}
+	UE_LOG(NavAware, Warning, TEXT("Stepping finished"))
 }
 
-void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, TArray<FNavPoint>& ArrayByDist, bool bOnlyOneForEachLine)
+void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine)
 {
+	OutArray = EdgesCollection;
 	/*
 	 *Delete elements in CurEdge's line including itself, preventing calculating their distance
 	 */
 	bool EnteredSameLine = false;
-	for (uint8 Index = 0; Index < ArrayByDist.Num(); Index++)
+	for (uint8 Index = 0; Index < OutArray.Num(); Index++)
 	{
-		if (ArrayByDist[Index].LineID == CurEdge.LineID)
+		if (OutArray[Index].LineID == CurEdge.LineID)
 		{
 			EnteredSameLine = true;
-			ArrayByDist.RemoveAt(Index);
+			OutArray.RemoveAt(Index);
 			Index--;
 		}
 		else
@@ -646,7 +662,7 @@ void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEd
 	}
 	//Sorting the Array by distance
 	FVector MiddlePointOnCurEdge = (CurEdge.Start+CurEdge.End)/2;
-	ArrayByDist.Sort([&MiddlePointOnCurEdge](const FNavPoint& EdgeA, const FNavPoint& EdgeB)
+	OutArray.Sort([&MiddlePointOnCurEdge](const FNavPoint& EdgeA, const FNavPoint& EdgeB)
 	{
 		return FVector::Dist(MiddlePointOnCurEdge, (EdgeA.Start + EdgeA.End)/2) < FVector::Dist(MiddlePointOnCurEdge, (EdgeB.Start + EdgeB.End)/2);
 	});
@@ -655,35 +671,21 @@ void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEd
 	{
 		//UE_LOG(NavAware, Warning, TEXT("Extracting the nearest edges of each line for edge: [%02d]"), CurEdge.EdgeID)
 		TArray<uint8> ContainedLine;
-		for (uint8 i = 0; i < ArrayByDist.Num(); i++)
+		for (uint8 i = 0; i < OutArray.Num(); i++)
 		{
-			if (ContainedLine.Contains(ArrayByDist[i].LineID))
+			if (ContainedLine.Contains(OutArray[i].LineID))
 			{
 				//UE_LOG(NavAware, Warning, TEXT("The nearest edge on line [%d] is already found, ditching: [%02d]"), ArrayByDist[i].LineID, ArrayByDist[i].EdgeID)
-				ArrayByDist.RemoveAt(i);
+				OutArray.RemoveAt(i);
 				i--;
 			}
 			else
 			{
 				//UE_LOG(NavAware, Warning, TEXT("[%02d] is the first edge found on line [%d], kept"), ArrayByDist[i].EdgeID, ArrayByDist[i].LineID)
-				ContainedLine.Push(ArrayByDist[i].LineID);
+				ContainedLine.Push(OutArray[i].LineID);
 			}
 		}
 	}
-	
-	//
-	// uint8 LoopingLine = 0;
-	// for(uint8 i = 0; i < ArrayByDist.Num(); i++)
-	// {
-	// 	if (ArrayByDist[i].LineID != LoopingLine)
-	// 	{
-	// 		LoopingLine = ArrayByDist[i].LineID;
-	// 	}
-	// 	else
-	// 	{
-	// 		ArrayByDist.RemoveAt(i);
-	// 	}
-	// }
 }
 
 void ANavAwareEnhancedBase::MakeEntries(TArray<FNavPoint>& InArray, TArray<FCorner>& InCorners)
