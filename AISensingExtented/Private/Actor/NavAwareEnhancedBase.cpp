@@ -581,7 +581,7 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 
 			//Get nearest edges to this edge from other lines
 			TArray<FNavPoint> NearestEdges;
-			GetNearestEdgesFromGivenArray(*LoopingEdge, InOutArray, NearestEdges);
+			SortEdgesByDistanceToGivenEdge(*LoopingEdge, InOutArray, NearestEdges);
 
 			//For every target edge
 			for (auto& CurTargetEdge : NearestEdges)
@@ -701,7 +701,7 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 	UE_LOG(NavAware, Warning, TEXT("Stepping finished"))
 }
 
-void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine)
+void ANavAwareEnhancedBase::SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine)
 {
 	OutArray = EdgesCollection;
 	/*

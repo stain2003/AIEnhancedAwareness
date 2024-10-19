@@ -221,9 +221,9 @@ private:
 
 	/*
 	 *Filter the nearest edges to given edge, from given array
-	 *Optional: get only one edge of each line
+	 *Optional: keep only one edge of each line
 	 */
-	void GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine = true);
+	void SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine = true);
 
 public:
 	
