@@ -11,7 +11,7 @@ static FORCEINLINE float XYDegrees(FVector const& A, FVector const& B)
 		FMath::Acos(FVector::DotProduct(FVector(ANormal.X, ANormal.Y, 0.f), FVector(BNormal.X, BNormal.Y, 0.f)))) * FMath::Sign(FVector::CrossProduct(A, B).Z);
 }
 
-static FORCEINLINE FVector GetClosestPointFromLineSegment(FVector& P, FVector& LineStart, FVector& LineEnd)
+static FORCEINLINE FVector GetClosestPointFromLineSegment(const FVector& P, const FVector& LineStart, const FVector& LineEnd)
 {
 	const float x1 = LineStart.X;
 	const float x2 = LineEnd.X;
