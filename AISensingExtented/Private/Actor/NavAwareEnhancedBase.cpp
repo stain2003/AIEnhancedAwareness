@@ -748,8 +748,3 @@ void ANavAwareEnhancedBase::GetNearestEdgesFromGivenArray(const FNavPoint& CurEd
 		}
 	}
 }
-
-void ANavAwareEnhancedBase::MakeEntries(TArray<FNavPoint>& InArray, TArray<FCorner>& InCorners)
-{
-	
-}

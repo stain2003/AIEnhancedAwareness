@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "StainMathLibrary.h"
 #include "GameFramework/Actor.h"
 #include "NavMesh/RecastNavMesh.h"
 
@@ -224,7 +225,6 @@ private:
 	 */
 	void GetNearestEdgesFromGivenArray(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine = true);
 
-	void MakeEntries(TArray<FNavPoint>& InArray, TArray<FCorner>& InCorners);
 public:
 	
 	FORCEINLINE bool CheckCorner(const float& curDeg) const
@@ -337,5 +337,28 @@ public:
 		}
 
 		return false;
+	}
+
+	FORCEINLINE std::tuple<FVector, FVector> GetShortestLineSegBetweenTwoLineSeg(FVector& EdgeAStart, FVector& EdgeAEnd, FVector& EdgeBStart, FVector& EdgeBEnd)
+	{
+		float LengthFromAStart = (GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd) - EdgeAStart).Length();
+		float LengthFromAEnd = (GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd) - EdgeAEnd).Length();
+		float LengthFromBStart = (GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd) - EdgeBStart).Length();
+		float LengthFromBEnd = (GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd) - EdgeBEnd).Length();
+
+		float minDist = FMath::Min(FMath::Min(LengthFromAStart, LengthFromAEnd), FMath::Min(LengthFromBStart, LengthFromBEnd));
+
+		switch (minDist)
+		{
+			default:
+		case LengthFromAStart :
+			return std::make_tuple(EdgeAStart, GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd));
+		case LengthFromAEnd :
+			return std::make_tuple(EdgeAEnd, GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd));
+		case LengthFromBStart :
+			return std::make_tuple(EdgeBStart, GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd));
+		case LengthFromBEnd :
+			return std::make_tuple(EdgeBEnd, GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd));
+		}
 	}
 };
