@@ -88,22 +88,27 @@ struct FEntry
 	GENERATED_BODY()
 	
 	uint8* CornerID = 0;
-	
+	uint8* CurrentLineID = 0;
 	uint8* TargetLineID = 0;
 
-	FNavPoint*	EdgeA = nullptr;
+	FNavPoint* EdgeA = nullptr;
 
 	FNavPoint* EdgeB = nullptr;
 	
 	FVector Start = FVector::ZeroVector;
 
 	FVector End = FVector::ZeroVector;
-
+	
 	float Width = 0.f;
-	// FORCEINLINE FEntry(FNavPoint* InStart = nullptr, FNavPoint* InEnd = nullptr, uint8 InID = 0)
-	// 	:CornerStart(InStart), CornerEnd(InEnd), CornerID(InID)
-	// {
-	// }
+
+	FVector Location = FVector::ZeroVector;
+
+	//reload operator==: only check if both has the same LineIDs, order is not necessary
+	bool operator==(const FEntry& Other) const
+	{
+		return (*CurrentLineID == *Other.CurrentLineID && *TargetLineID == *Other.TargetLineID) ||
+			   (*CurrentLineID == *Other.TargetLineID && *TargetLineID == *Other.CurrentLineID);
+	}
 };
 
 UCLASS()
@@ -135,6 +140,10 @@ protected:
 	/*Array that used to be store nearby edges*/
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
 	TArray<FCorner> Corners;
+
+	/*Array that used to be store nearby edges*/
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category= "TerranInfo")
+	TArray<FEntry> Entries;
 	
 	/*Prints out elements from stored array with info, only works when bDebug is ture*/
 	UPROPERTY(EditAnywhere, Category= "TerranInfo")
@@ -320,7 +329,7 @@ public:
 		return Start + OutFVector * CurStep;
 	}
 
-	FORCEINLINE bool CheckIfWithinEdge(const FVector& Start, const FVector& End, FVector& Vector)
+	FORCEINLINE bool CheckIfWithinEdge(const FVector& Start, const FVector& End, const FVector& Vector)
 	{
 		float maxx,minx,maxy,miny;
 		
@@ -339,32 +348,35 @@ public:
 		return false;
 	}
 
-	FORCEINLINE std::tuple<FVector, FVector> GetShortestLineSegBetweenTwoLineSeg(const FVector& EdgeAStart, const FVector& EdgeAEnd, const FVector& EdgeBStart, const FVector& EdgeBEnd)
+	FORCEINLINE FVector GetPerpendicularLineFromPointOnEdgeInPolySide(const FVector& Point, const FNavPoint& Edge, const float Length = 50.f)
 	{
-		const float LengthFromAStart = (GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd) - EdgeAStart).Length();
-		const float LengthFromAEnd = (GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd) - EdgeAEnd).Length();
-		const float LengthFromBStart = (GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd) - EdgeBStart).Length();
-		const float LengthFromBEnd = (GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd) - EdgeBEnd).Length();
+		const FVector EdgeStart = Edge.Start;
+		const FVector EdgeEnd = Edge.End;
+		//if (!CheckIfWithinEdge(EdgeStart, EdgeEnd, Point)) return FVector::ZeroVector;
+		
+		const FVector LineNormal = (EdgeEnd - EdgeStart).GetSafeNormal2D();
+		const FVector StartToPolyCenterN = (GetEdgePolyCenter(Edge) - EdgeStart).GetSafeNormal2D();
 
-		const float minDist = FMath::Min(FMath::Min(LengthFromAStart, LengthFromAEnd), FMath::Min(LengthFromBStart, LengthFromBEnd));
+		const FVector PerpendicularLine = FRotator(0.f, 90.f * FMath::Sign(XYDegrees(LineNormal, StartToPolyCenterN)), 0.f).RotateVector(LineNormal);
+		
+		return PerpendicularLine*Length + Point;
+	}
 
-		if (minDist == LengthFromAStart)
+	FORCEINLINE bool IsUnique(TArray<FEntry>& FEntries, FEntry& newElem)
+	{
+		if (FEntries.Num() == 0)
 		{
-			return std::make_tuple(EdgeAStart, GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd));
+			return true;
 		}
-		if (minDist == LengthFromAEnd)
+		
+		for (const auto& ExistedElem : FEntries)
 		{
-			return std::make_tuple(EdgeAEnd, GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd));
+			if (ExistedElem == newElem)
+			{
+				return false;
+			}
 		}
-		if (minDist == LengthFromBStart)
-		{
-			return std::make_tuple(EdgeBStart, GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd));
-		}
-		if (minDist == LengthFromBEnd)
-		{
-			return std::make_tuple(EdgeBEnd, GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd));
-		}
-
-		return std::make_tuple(FVector::ZeroVector, FVector::ZeroVector);
+		
+		return true;
 	}
 };

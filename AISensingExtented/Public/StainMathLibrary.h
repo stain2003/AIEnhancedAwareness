@@ -42,3 +42,35 @@ static FORCEINLINE FVector GetClosestPointFromLineSegment(const FVector& P, cons
 	
 	return FVector(x1 + t * (x2 - x1), y1 + t * (y2 - y1), z1 + t * (z2 - z1));
 }
+
+/*Return the shortest line segment connects to two line segment A and B
+ *The 1st return FVector is on A, the 2nd FVector is on B
+ */
+static FORCEINLINE std::tuple<FVector, FVector> GetShortestLineSegBetweenTwoLineSeg(const FVector& EdgeAStart, const FVector& EdgeAEnd, const FVector& EdgeBStart, const FVector& EdgeBEnd)
+{
+	const float LengthFromAStart = (GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd) - EdgeAStart).Length();
+	const float LengthFromAEnd = (GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd) - EdgeAEnd).Length();
+	const float LengthFromBStart = (GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd) - EdgeBStart).Length();
+	const float LengthFromBEnd = (GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd) - EdgeBEnd).Length();
+
+	const float minDist = FMath::Min(FMath::Min(LengthFromAStart, LengthFromAEnd), FMath::Min(LengthFromBStart, LengthFromBEnd));
+
+	if (minDist == LengthFromAStart)
+	{
+		return std::make_tuple(EdgeAStart, GetClosestPointFromLineSegment(EdgeAStart, EdgeBStart, EdgeBEnd));
+	}
+	if (minDist == LengthFromAEnd)
+	{
+		return std::make_tuple(EdgeAEnd, GetClosestPointFromLineSegment(EdgeAEnd, EdgeBStart, EdgeBEnd));
+	}
+	if (minDist == LengthFromBStart)
+	{
+		return std::make_tuple(GetClosestPointFromLineSegment(EdgeBStart, EdgeAStart, EdgeAEnd), EdgeBStart);
+	}
+	if (minDist == LengthFromBEnd)
+	{
+		return std::make_tuple(GetClosestPointFromLineSegment(EdgeBEnd, EdgeAStart, EdgeAEnd), EdgeBEnd);
+	}
+
+	return std::make_tuple(FVector::ZeroVector, FVector::ZeroVector);
+}

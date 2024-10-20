@@ -98,6 +98,16 @@ void ANavAwareEnhancedBase::FindNearestEdges(bool bDebug, float radius)
 			DrawDebugBox(GetWorld(), Start->Start, FVector(5.f, 5.f, 50.f), FColor::Green, false, 1.f);
 			DrawDebugBox(GetWorld(), End->End, FVector(5.f, 5.f, 50.f), FColor::Green, false, 1.f);
 		}
+		for (const auto& Entry : Entries)
+		{
+			DrawDebugDirectionalArrow(GetWorld(), Entry.Start, Entry.End, 5.f, FColor::Green, false, 1.f);
+			DrawDebugDirectionalArrow(GetWorld(), Entry.Start, GetPerpendicularLineFromPointOnEdgeInPolySide(Entry.Start, *Entry.EdgeA), 5.f, FColor::Yellow, false, 1.f);
+			
+			if (bShowLog)
+			{
+				UE_LOG(NavAware, Display, TEXT("Entry: CornerEdge: [%02d], TargetEdge: [%02d], width: %.1f, LineA: %d, LineB: %d"), Entry.EdgeA->EdgeID, Entry.EdgeB->EdgeID, Entry.Width, *Entry.CurrentLineID, *Entry.TargetLineID)
+			}
+		}
 	}
 }
 
@@ -552,13 +562,13 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 
 void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool bDebug)
 {
+	Entries.Empty();
 	if (InOutArray.Num() < 2)	return;
 	
 	UE_LOG(NavAware, Warning, TEXT("Starting to steps for each corner and find entries from them"))
 	/*For every corner*/
 	for (auto& CurCorner : Corners)
 	{
-		//UE_LOG(NavAware, Warning, TEXT("Current Corner: [%02d]"), CurCorner.CornerID)
 		/*CurEntries: stores entries derived from current corner to other lines*/
 		TMap<uint8, FEntry> FoundEntries;
 		/*For every edge on this corner*/
@@ -574,7 +584,6 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 			{
 				LoopingEdge = CurCorner.CornerStart;
 			}
-			UE_LOG(NavAware, Warning, TEXT("Current Edge on this corner: [%02d]"), LoopingEdge->EdgeID)
 			
 			FVector EdgeStart = LoopingEdge->Start;
 			FVector EdgeEnd = LoopingEdge->End;
@@ -595,35 +604,30 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 				FVector PointOnTargeEdge;
 				std::tie(PointOnLoopingEdge, PointOnTargeEdge) = GetShortestLineSegBetweenTwoLineSeg(EdgeStart, EdgeEnd, TargetEdgeStart, TargetEdgeEnd);
 				float NewWidth = (PointOnTargeEdge - PointOnLoopingEdge).Length();
-				
-				if (FoundEntries.Find(TargetLineID))
+					
+				const float DegreeBetweenPerpendicularLineAndEntryLine = XYDegrees(GetPerpendicularLineFromPointOnEdgeInPolySide(PointOnLoopingEdge, *LoopingEdge) - PointOnLoopingEdge, PointOnTargeEdge - PointOnLoopingEdge);
+				UE_LOG(NavAware, Warning, TEXT("CurEdge: [%02d], TargetEdge: [%02d], Degree: %.1f"), LoopingEdge->EdgeID, CurTargetEdge.EdgeID, DegreeBetweenPerpendicularLineAndEntryLine)
+				if (DegreeBetweenPerpendicularLineAndEntryLine < 45.f && DegreeBetweenPerpendicularLineAndEntryLine > -45.f)
 				{
-					if (NewWidth < FoundEntries[TargetLineID].Width)
-					{
-						UE_LOG(NavAware, Warning, TEXT("[%02d]: shorter entry found: edgeA: [%02d], edgeB: [%02d], new width: %.1f, old width: %.1f"), CurCorner.CornerID, LoopingEdge->EdgeID, CurTargetEdge.EdgeID, NewWidth, FoundEntries[CurTargetEdge.LineID].Width)
-						*FoundEntries.Find(CurTargetEdge.LineID) =
-									FEntry(&CurCorner.CornerID, &CurTargetEdge.LineID, LoopingEdge, &CurTargetEdge, PointOnLoopingEdge, PointOnTargeEdge, NewWidth);
-					}
-				}
-				else
-				{
-					UE_LOG(NavAware, Warning, TEXT("[%02d]: New entry: edgeA: [%02d], edgeB: [%02d], width: %.1f"), CurCorner.CornerID, LoopingEdge->EdgeID, CurTargetEdge.EdgeID, NewWidth)
-					FoundEntries.Emplace(TargetLineID, FEntry(&CurCorner.CornerID, &CurTargetEdge.LineID, LoopingEdge, &CurTargetEdge, PointOnLoopingEdge, PointOnTargeEdge, NewWidth));
+					if (FoundEntries.Find(TargetLineID))
+                    {
+                    	if (NewWidth < FoundEntries[TargetLineID].Width)
+                    	{
+                    		continue;
+                    	}
+                    }
+					FoundEntries.FindOrAdd(CurTargetEdge.LineID) =
+						FEntry(&CurCorner.CornerID, &LoopingEdge->LineID, &TargetLineID, LoopingEdge, &CurTargetEdge, PointOnLoopingEdge, PointOnTargeEdge, NewWidth);
 				}
 			}
 		}
-		
+		//Push result to a global array
 		for (auto& Elem : FoundEntries)
 		{
 			FEntry& Value = Elem.Value;
-			UE_LOG(NavAware, Warning, TEXT("Entries: Corner: [%02d], TargetLine: [%d], EdgeA: [%02d], EdgeB: [%02d], Width: [%.1f]"),
-				*Value.CornerID, Elem.Key, Value.EdgeA->EdgeID, Value.EdgeB->EdgeID, Value.Width)
-			
-			if (*Value.CornerID == 7)
-			{
-				DrawDebugDirectionalArrow(GetWorld(), Value.Start, Value.End, 5.f, FColor::Green, false, 1.f, 0, 2.f);
-			}
+			Entries.Push(Value);
 		}
+		
 	}
 	UE_LOG(NavAware, Warning, TEXT("Stepping finished"))
 }
