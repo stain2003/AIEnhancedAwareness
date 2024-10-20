@@ -560,7 +560,7 @@ void ANavAwareEnhancedBase::MakeCornerArray(TArray<FNavPoint>& InArray, TArray<F
 	}
 }
 
-void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool bDebug)
+void ANavAwareEnhancedBase::TakeSteps(TArray<FNavPoint>& InOutArray, bool bDebug)
 {
 	Entries.Empty();
 	if (InOutArray.Num() < 2)	return;
@@ -587,18 +587,19 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 			
 			FVector EdgeStart = LoopingEdge->Start;
 			FVector EdgeEnd = LoopingEdge->End;
-
+			uint8& LineAID = LoopingEdge->LineID;
+			
 			//Get nearest edges to this edge from other lines
-			TArray<FNavPoint> NearestEdges;
+			TArray<FNavPoint*> NearestEdges;
 			SortEdgesByDistanceToGivenEdge(*LoopingEdge, InOutArray, NearestEdges);
 
 			//For every target edge
 			for (auto& CurTargetEdge : NearestEdges)
 			{
-				const FVector& TargetEdgeStart = CurTargetEdge.Start;
-				const FVector& TargetEdgeEnd = CurTargetEdge.End;
-				uint8& TargetLineID = CurTargetEdge.LineID;
-
+				const FVector& TargetEdgeStart = CurTargetEdge->Start;
+				const FVector& TargetEdgeEnd = CurTargetEdge->End;
+				const uint8& LineBID = CurTargetEdge->LineID;
+					
 				
 				FVector PointOnLoopingEdge;
 				FVector PointOnTargeEdge;
@@ -606,18 +607,18 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 				float NewWidth = (PointOnTargeEdge - PointOnLoopingEdge).Length();
 					
 				const float DegreeBetweenPerpendicularLineAndEntryLine = XYDegrees(GetPerpendicularLineFromPointOnEdgeInPolySide(PointOnLoopingEdge, *LoopingEdge) - PointOnLoopingEdge, PointOnTargeEdge - PointOnLoopingEdge);
-				UE_LOG(NavAware, Warning, TEXT("CurEdge: [%02d], TargetEdge: [%02d], Degree: %.1f"), LoopingEdge->EdgeID, CurTargetEdge.EdgeID, DegreeBetweenPerpendicularLineAndEntryLine)
+				UE_LOG(NavAware, Warning, TEXT("CurEdge: [%02d], TargetEdge: [%02d], Degree: %.1f"), LoopingEdge->EdgeID, CurTargetEdge->EdgeID, DegreeBetweenPerpendicularLineAndEntryLine)
 				if (DegreeBetweenPerpendicularLineAndEntryLine < 45.f && DegreeBetweenPerpendicularLineAndEntryLine > -45.f)
 				{
-					if (FoundEntries.Find(TargetLineID))
+					if (FoundEntries.Find(LineBID))
                     {
-                    	if (NewWidth < FoundEntries[TargetLineID].Width)
+                    	if (NewWidth < FoundEntries[LineBID].Width)
                     	{
                     		continue;
                     	}
                     }
-					FoundEntries.FindOrAdd(CurTargetEdge.LineID) =
-						FEntry(&CurCorner.CornerID, &LoopingEdge->LineID, &TargetLineID, LoopingEdge, &CurTargetEdge, PointOnLoopingEdge, PointOnTargeEdge, NewWidth);
+					FoundEntries.FindOrAdd(CurTargetEdge->LineID) =
+						FEntry(&CurCorner.CornerID, &LineAID, &CurTargetEdge->LineID, LoopingEdge, CurTargetEdge, PointOnLoopingEdge, PointOnTargeEdge, NewWidth, (PointOnLoopingEdge + PointOnTargeEdge)/2);
 				}
 			}
 		}
@@ -625,23 +626,35 @@ void ANavAwareEnhancedBase::TakeSteps(const TArray<FNavPoint>& InOutArray, bool 
 		for (auto& Elem : FoundEntries)
 		{
 			FEntry& Value = Elem.Value;
-			Entries.Push(Value);
+			if (IsUnique(Entries, Value))
+			{
+				Entries.Push(Value);
+			}
 		}
 		
 	}
 	UE_LOG(NavAware, Warning, TEXT("Stepping finished"))
 }
 
-void ANavAwareEnhancedBase::SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine)
+void ANavAwareEnhancedBase::SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint*>& OutArray, bool bOnlyOneForEachLine)
 {
-	OutArray = EdgesCollection;
+	if (EdgesCollection.Num() == 0)
+	{
+		return;
+	}
+
+	for (auto& Elem : EdgesCollection)
+	{
+		OutArray.Add(&Elem);
+	}
+	
 	/*
 	 *Delete elements in CurEdge's line including itself, preventing calculating their distance
 	 */
 	bool EnteredSameLine = false;
 	for (uint8 Index = 0; Index < OutArray.Num(); Index++)
 	{
-		if (OutArray[Index].LineID == CurEdge.LineID)
+		if (OutArray[Index]->LineID == CurEdge.LineID)
 		{
 			EnteredSameLine = true;
 			OutArray.RemoveAt(Index);
@@ -665,7 +678,7 @@ void ANavAwareEnhancedBase::SortEdgesByDistanceToGivenEdge(const FNavPoint& CurE
 		TArray<uint8> ContainedLine;
 		for (uint8 i = 0; i < OutArray.Num(); i++)
 		{
-			if (ContainedLine.Contains(OutArray[i].LineID))
+			if (ContainedLine.Contains(OutArray[i]->LineID))
 			{
 				//UE_LOG(NavAware, Warning, TEXT("The nearest edge on line [%d] is already found, ditching: [%02d]"), ArrayByDist[i].LineID, ArrayByDist[i].EdgeID)
 				OutArray.RemoveAt(i);
@@ -674,7 +687,7 @@ void ANavAwareEnhancedBase::SortEdgesByDistanceToGivenEdge(const FNavPoint& CurE
 			else
 			{
 				//UE_LOG(NavAware, Warning, TEXT("[%02d] is the first edge found on line [%d], kept"), ArrayByDist[i].EdgeID, ArrayByDist[i].LineID)
-				ContainedLine.Push(OutArray[i].LineID);
+				ContainedLine.Push(OutArray[i]->LineID);
 			}
 		}
 	}

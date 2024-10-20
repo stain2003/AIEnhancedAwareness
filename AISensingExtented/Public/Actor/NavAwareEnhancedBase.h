@@ -226,13 +226,13 @@ private:
 	 * Looping through the array, find corner and out entries and do follow things:
 	 * For every said above edges, we make a new array that stores none family edges, in the order of distance
 	 */
-	void TakeSteps(const TArray<FNavPoint>& InOutArray, bool bDebug = false);
+	void TakeSteps(TArray<FNavPoint>& InOutArray, bool bDebug = false);
 
 	/*
 	 *Filter the nearest edges to given edge, from given array
 	 *Optional: keep only one edge of each line
 	 */
-	void SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, const TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint>& OutArray, bool bOnlyOneForEachLine = true);
+	void SortEdgesByDistanceToGivenEdge(const FNavPoint& CurEdge, TArray<FNavPoint>& EdgesCollection, TArray<FNavPoint*>& OutArray, bool bOnlyOneForEachLine = true);
 
 public:
 	
